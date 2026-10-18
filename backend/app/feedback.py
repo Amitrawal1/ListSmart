@@ -6,7 +6,7 @@ import time
 from pathlib import Path
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 # Only one thread may write to the file at a time, so lines never get mixed up
 _file_lock = threading.Lock()
@@ -20,6 +20,14 @@ class Feedback(BaseModel):
     price_ok_inr: float | None = Field(None, ge=0, le=100_000)
     comment: str = Field("", max_length=2000)
     listing: dict | None = None
+
+    # Stop very large listings from filling up the feedback file
+    @field_validator("listing")
+    @classmethod
+    def listing_not_too_big(cls, value):
+        if value is not None and len(json.dumps(value, ensure_ascii=False)) > 20_000:
+            raise ValueError("listing is too large")
+        return value
 
 
 def save_feedback(item: Feedback, path: Path) -> None:

@@ -2,6 +2,7 @@
 
 import io
 import json
+import sys
 
 import requests
 from fastapi.testclient import TestClient
@@ -246,3 +247,62 @@ def test_feedback_rejects_bad_values():
     assert client.post("/api/feedback", json={"rating": "meh"}).status_code == 422
     assert client.post("/api/feedback", json={"would_pay": "sure"}).status_code == 422
     assert client.post("/api/feedback", json={"price_ok_inr": -5}).status_code == 422
+
+
+def test_tinker_writer_works_without_cookbook(monkeypatch):
+    """On Render only the tinker SDK is installed: the raw Qwen3 prompt is used instead of a renderer."""
+    import json
+    import types as pytypes
+
+    from app import writer
+    from app.chat_template import STOP_STRINGS, build_raw_prompt
+    from app.config import get_settings
+    from app.prompts import build_writer_messages
+
+    # A tiny stand-in for the tinker SDK, so the test needs no network or package
+    fake_types = pytypes.SimpleNamespace(
+        SamplingParams=lambda **kw: kw,
+        ModelInput=pytypes.SimpleNamespace(from_ints=lambda tokens: ("ints", tokens)),
+    )
+    monkeypatch.setitem(sys.modules, "tinker", pytypes.SimpleNamespace(types=fake_types))
+
+    listing = {"title": "Red Mug", "description": "A mug.\n\nNice.", "bullets": ["a"] * 5,
+               "tags": ["mug"], "search_query": "red ceramic mug"}
+    seen = {}
+
+    class FakeTokenizer:
+        def encode(self, text, add_special_tokens=True):
+            seen["text"], seen["special"] = text, add_special_tokens
+            return [1, 2, 3]
+
+        def decode(self, tokens, skip_special_tokens=False):
+            return json.dumps(listing) + ("" if skip_special_tokens else "<|im_end|>")
+
+    class FakeClient:
+        def sample(self, prompt, num_samples, sampling_params):
+            seen["prompt"], seen["params"] = prompt, sampling_params
+            seq = pytypes.SimpleNamespace(tokens=[9, 9])
+            return pytypes.SimpleNamespace(result=lambda: pytypes.SimpleNamespace(sequences=[seq]))
+
+    monkeypatch.setattr(writer, "_get_tinker", lambda settings: (FakeClient(), None, FakeTokenizer()))
+    attrs = {"product_type": "mug", "colors": ["red"]}
+    out = writer.tinker_listing(attrs, "meesho", "", get_settings())
+
+    assert out["title"] == "Red Mug"
+    assert seen["text"] == build_raw_prompt(build_writer_messages(attrs, "meesho", ""))
+    assert seen["special"] is False
+    assert seen["prompt"] == ("ints", [1, 2, 3])
+    assert seen["params"]["stop"] == STOP_STRINGS
+
+
+
+def test_rejects_too_long_notes_and_huge_feedback():
+    from tests.test_api import tiny_png
+
+    # Notes over 1000 characters are refused
+    r = client.post("/api/generate", data={"notes": "x" * 1001},
+                    files=[("images", ("p.png", tiny_png(), "image/png"))])
+    assert r.status_code == 400
+    # A listing bigger than 20k characters is refused
+    r = client.post("/api/feedback", json={"listing": {"title": "x" * 25_000}})
+    assert r.status_code == 422

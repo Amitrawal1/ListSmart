@@ -424,7 +424,8 @@
             : "Private mode: competitor prices were not checked. Add your cost price to get a suggestion.";
         }
         if (cost > 0 && typeof data.pricing.suggested_price === "number") {
-          data.pricing.margin_pct = Math.round(((data.pricing.suggested_price - cost) / cost) * 100);
+          // Same formula as the backend: profit as a % of the selling price
+          data.pricing.margin_pct = Math.round(((data.pricing.suggested_price - cost) / data.pricing.suggested_price) * 1000) / 10;
         }
       } else {
         // Build the multipart form. The field name "images" is repeated once per photo.
@@ -786,7 +787,7 @@
 
     $("price-big").textContent = formatINR(p.suggested_price);
     $("margin").textContent = typeof p.margin_pct === "number"
-      ? "About " + Math.round(p.margin_pct) + "% margin over your cost price."
+      ? "About " + Math.round(p.margin_pct) + "% profit margin (share of the selling price you keep after cost)."
       : "Add your cost price to see your margin.";
     $("strategy").textContent = p.strategy || "";
     $("strategy").hidden = !p.strategy;
@@ -1067,6 +1068,15 @@
     if (!listing || typeof listing !== "object") {
       // The model may have returned raw text that could not be parsed
       box.appendChild(el("p", "", listing ? String(listing) : "(no output)"));
+      return box;
+    }
+    // evaluate.py stores unparseable answers as {"invalid_output": raw text, "error": why}
+    if (typeof listing.invalid_output === "string") {
+      box.appendChild(el("p", "small muted", "Not a valid listing" + (listing.error ? " (" + listing.error + ")" : "") + ":"));
+      const raw = el("pre", "small", listing.invalid_output || "(empty output)");
+      raw.style.whiteSpace = "pre-wrap"; // wrap long model text instead of scrolling sideways
+      raw.style.overflowWrap = "anywhere";
+      box.appendChild(raw);
       return box;
     }
     if (listing.title) {

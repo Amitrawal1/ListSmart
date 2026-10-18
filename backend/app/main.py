@@ -126,6 +126,9 @@ async def generate(
     platform = (platform or "meesho").strip().lower()
     if platform not in PLATFORMS:
         raise HTTPException(400, "platform must be 'meesho' or 'etsy'.")
+    # Keep seller notes short so nobody can send a giant prompt
+    if len(notes or "") > 1000:
+        raise HTTPException(400, "notes must be 1000 characters or less.")
     cost = parse_cost(cost_price)
     image_data = await read_images(images)
     settings = get_settings()

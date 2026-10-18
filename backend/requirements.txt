@@ -10,5 +10,6 @@ google-genai==1.2.0
 pytest==8.3.4
 httpx==0.28.1
 pillow==11.1.0
-# Optional: only needed when WRITER_BACKEND=tinker (the app runs without them)
-# pip install tinker tinker-cookbook
+# Tinker SDK: samples our fine-tuned writer when WRITER_BACKEND=tinker (the Render default).
+# tinker-cookbook is NOT needed here (it pulls in torch); writer.py builds the same prompt itself.
+tinker==0.34.0

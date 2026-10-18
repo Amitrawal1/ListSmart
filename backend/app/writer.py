@@ -119,7 +119,11 @@ _tinker_cache: dict[str, tuple] = {}
 
 
 def _get_tinker(settings: Settings):
-    """Return (sampling_client, renderer) for the fine-tuned checkpoint, cached."""
+    """Return (sampling_client, renderer, tokenizer) for the fine-tuned checkpoint, cached.
+
+    renderer is None when tinker-cookbook is not installed (it needs torch, too big for
+    Render's free plan). Then we use chat_template.py, which builds the same prompt.
+    """
     key = settings.tinker_model_path
     with _tinker_lock:
         if key in _tinker_cache:
@@ -129,7 +133,6 @@ def _get_tinker(settings: Settings):
         import os
 
         import tinker
-        from tinker_cookbook import renderers
 
         # The tinker SDK reads the key from the environment
         os.environ.setdefault("TINKER_API_KEY", settings.tinker_api_key)
@@ -139,9 +142,17 @@ def _get_tinker(settings: Settings):
 
         # Use the same chat template as training (thinking turned off for Qwen3)
         renderer_name = settings.tinker_renderer
-        renderer = renderers.get_renderer(renderer_name, tokenizer)
+        try:
+            from tinker_cookbook import renderers
 
-        _tinker_cache[key] = (sampling_client, renderer)
+            renderer = renderers.get_renderer(renderer_name, tokenizer)
+        except ImportError:
+            # Our own template only matches the Qwen3 "thinking off" renderer used in training
+            if renderer_name != "qwen3_disable_thinking":
+                raise RuntimeError(f"renderer {renderer_name} needs tinker-cookbook installed")
+            renderer = None
+
+        _tinker_cache[key] = (sampling_client, renderer, tokenizer)
         return _tinker_cache[key]
 
 
@@ -149,8 +160,17 @@ def tinker_listing(attributes: dict, platform: str, notes: str, settings: Settin
     """Sample the fine-tuned LoRA model on Tinker."""
     from tinker import types
 
-    sampling_client, renderer = _get_tinker(settings)
+    sampling_client, renderer, tokenizer = _get_tinker(settings)
     messages = build_writer_messages(attributes, platform, notes)
+    if renderer is None:
+        # No cookbook: tokenise our raw prompt (same tokens as the renderer, see finetune/tests)
+        tokens = tokenizer.encode(build_raw_prompt(messages), add_special_tokens=False)
+        params = types.SamplingParams(max_tokens=MAX_TOKENS, temperature=0.7, stop=STOP_STRINGS)
+        prompt = types.ModelInput.from_ints(tokens)
+        result = sampling_client.sample(prompt=prompt, num_samples=1, sampling_params=params).result()
+        text = tokenizer.decode(result.sequences[0].tokens, skip_special_tokens=True)
+        return parse_listing(text, platform)
+
     prompt = renderer.build_generation_prompt(messages)
     params = types.SamplingParams(
         max_tokens=MAX_TOKENS, temperature=0.7, stop=renderer.get_stop_sequences()

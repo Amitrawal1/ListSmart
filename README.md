@@ -77,6 +77,11 @@ ListSmart/
 
 Needs Python 3.11+ and [Ollama](https://ollama.com) (free, open source).
 
+**Check your setup any time with `python3 scripts/doctor.py`** (stdlib only, no venv needed): it prints a ✓/✗
+checklist (Python, venv, `.env` keys, Ollama + models, free disk, fine-tune results) and the fix commands in order.
+`python3 scripts/doctor.py --init` also copies `.env.example` to `.env`. Low on disk (the LoRA -> GGUF export needs
+~23-27 GB)? Build `listsmart-writer` on Google Colab with [finetune/colab_export.ipynb](finetune/colab_export.ipynb).
+
 ### 1. Get the open models
 
 ```bash

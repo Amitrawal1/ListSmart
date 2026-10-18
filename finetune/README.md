@@ -219,7 +219,13 @@ Steps skip themselves when their output exists, so a stopped run resumes. Partia
 
 **Disk on this laptop:** about 13 GB was free when this was written - not enough for either path.
 Options: free ~20 GB; or `--export-dir /Volumes/<external-drive>/listsmart-export`; or run the export on
-Colab/Kaggle (Linux, ~100 GB disk) and bring back only the result:
+Colab/Kaggle (Linux, ~100 GB disk) and bring back only the result.
+
+**Easiest: open [`colab_export.ipynb`](colab_export.ipynb) in Google Colab** (CPU runtime is enough). It gets the code
+(git clone or zip upload), builds llama.cpp, asks for `TINKER_API_KEY`, runs
+`export_to_ollama.py --cleanup --skip create --tinker-path ...`, copies the Q4_K_M `.gguf` + `Modelfile` to Google Drive,
+and its last cell lists the Mac commands (`ollama create listsmart-writer -f finetune/export/Modelfile`).
+`python3 scripts/doctor.py` (from the project root) then checks that the model is there. The same thing by hand:
 
 ```bash
 # on Colab: clone the repo, then
