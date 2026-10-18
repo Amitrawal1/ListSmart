@@ -6,3 +6,4 @@ __pycache__/
 .DS_Store
 finetune/data/train.jsonl
 finetune/data/val.jsonl
+/data/

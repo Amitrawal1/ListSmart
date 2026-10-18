@@ -25,6 +25,16 @@ except ImportError:
     prompts = importlib.util.module_from_spec(_spec)
     _spec.loader.exec_module(prompts)
 
+# The raw Qwen3 prompt builder used when the writer runs locally in Ollama (same file as the app)
+try:
+    from app import chat_template  # noqa: E402
+except ImportError:
+    import importlib.util
+
+    _spec = importlib.util.spec_from_file_location("chat_template", BACKEND_DIR / "app" / "chat_template.py")
+    chat_template = importlib.util.module_from_spec(_spec)
+    _spec.loader.exec_module(chat_template)
+
 # Default base model to fine-tune (see README for why we picked it)
 DEFAULT_BASE_MODEL = "Qwen/Qwen3-8B"
 

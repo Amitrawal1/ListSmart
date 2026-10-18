@@ -26,9 +26,29 @@
   let files = []; // photos the seller picked: [{ file, url }]
   let tags = []; // current tags (editable)
   let lastResult = null; // last response from the backend
+  let health = null; // last /api/health answer (used for the loading step labels)
+  let feedbackState = null; // what the seller already told us about the current result
+  let demoFeedback = []; // feedback saved in memory while in demo mode
+
+  // localStorage can throw (private window, blocked storage), so always wrap it
+  const PRIVATE_KEY = "listsmart.privateMode";
+  function loadPrivateChoice() {
+    try {
+      const v = window.localStorage.getItem(PRIVATE_KEY);
+      return v === null ? null : v === "true";
+    } catch (e) {
+      return null;
+    }
+  }
+  function savePrivateChoice(on) {
+    try { window.localStorage.setItem(PRIVATE_KEY, on ? "true" : "false"); } catch (e) { /* ignore */ }
+  }
 
   // ---------- Built-in sample data for demo mode ----------
-  const MOCK_HEALTH = { ok: true, writer_backend: "mock", gemma: false, serpapi: false, tinker: false };
+  const MOCK_HEALTH = {
+    ok: true, writer_backend: "ollama", vision_backend: "ollama", gemma: false, serpapi: false, tinker: false,
+    ollama: true, ollama_models: ["gemma3:4b", "listsmart-writer:latest", "qwen3:8b"], offline_mode: false
+  };
 
   const MOCK_RESULT = {
     attributes: {
@@ -72,7 +92,12 @@
       strategy: "Competitors sit between ₹399 and ₹599 for most listings (median ₹489). We undercut the median by about 5% and end the price in 9, which lands at ₹459 — inside the busy middle of the market.",
       margin_pct: null
     },
-    meta: { writer_backend: "mock", latency_ms: 1840 }
+    request_id: "demo",
+    meta: {
+      writer_backend: "ollama", vision_backend: "ollama", latency_ms: 9840,
+      pricing_source: "mock", ran_locally: true, data_left_device: [], cost_inr: 0,
+      timings_ms: { vision: 4120, writer: 5480, pricing: 240 }
+    }
   };
 
   const MOCK_EVAL = {
@@ -88,6 +113,12 @@
       rouge_l: { base: 0.21, finetuned: 0.34 }
     },
     judge: { finetuned_win: 0.64, base_win: 0.22, tie: 0.14 },
+    speed: {
+      base: { median_latency_s: 9.8, tokens_per_s: 11.2 },
+      finetuned: { median_latency_s: 7.1, tokens_per_s: 11.5 },
+      hardware: "sample: MacBook Air M1, 8 GB"
+    },
+    cost_per_1000_listings_inr: { local: 0, tinker_hosted: 42, closed_api: 180 },
     examples: [{
       attributes: MOCK_RESULT.attributes,
       base: { title: "Beautiful Maroon Kurti For Women Very Nice Quality Best Price Cotton Kurti Block Print Ethnic Wear Party Office Daily Use", bullets: ["Nice kurti", "Good quality"], tags: ["kurti", "women kurti for festive occasions"] },
@@ -149,6 +180,11 @@
   }
 
   // ---------- Health badge ----------
+  // True if Ollama has a model whose name starts with this prefix ("gemma3" matches "gemma3:4b")
+  function hasModel(models, prefix) {
+    return (models || []).some((m) => String(m).toLowerCase().startsWith(prefix));
+  }
+
   async function loadHealth() {
     const box = $("health");
     let h;
@@ -165,17 +201,90 @@
       box.querySelector(".health-text").textContent = "Backend offline — try ?demo=1";
       return;
     }
+    health = h;
 
     box.className = "health ok";
     box.textContent = "";
     box.appendChild(el("span", "health-dot"));
     box.appendChild(el("span", "", DEMO ? "Demo" : "Writer: " + (h.writer_backend || "?")));
-    // One small pill per service: green = live, amber = mock
-    [["Gemma", h.gemma], ["SerpApi", h.serpapi], ["Tinker", h.tinker]].forEach(([name, live]) => {
+
+    // Ollama pill: shows if the local model server is running and which models it has
+    if (typeof h.ollama === "boolean") {
+      const models = h.ollama_models || [];
+      const pill = el("span", "svc " + (h.ollama ? "live" : "mock"),
+        h.ollama ? "Ollama on · " + models.length + " model" + (models.length === 1 ? "" : "s") : "Ollama off");
+      pill.title = h.ollama
+        ? "Local models: " + (models.join(", ") || "none")
+        : "Ollama is not running, so the app falls back to hosted or mock models";
+      box.appendChild(pill);
+    }
+    // One small pill per hosted service: green = live, amber = mock
+    [["Gemma API", h.gemma], ["SerpApi", h.serpapi], ["Tinker", h.tinker]].forEach(([name, live]) => {
       const pill = el("span", "svc " + (live ? "live" : "mock"), name + (live ? " live" : " mock"));
       pill.title = live ? name + " is connected" : name + " key missing, using offline mock";
       box.appendChild(pill);
     });
+
+    renderHealthHint(h);
+
+    // If the seller never chose, start private mode the same way the server is set up
+    if (loadPrivateChoice() === null && h.offline_mode === true) $("offline-toggle").checked = true;
+    updateStepLabels();
+  }
+
+  // Explain in plain words what to install when Ollama or a model is missing
+  function renderHealthHint(h) {
+    const box = $("health-hint");
+    box.textContent = "";
+    if (typeof h.ollama !== "boolean") { box.hidden = true; return; } // older backend, nothing to say
+
+    const tips = [];
+    const models = h.ollama_models || [];
+    if (!h.ollama) {
+      tips.push(["Ollama is not running. Install it from ollama.com, start it, then run:", "ollama pull gemma3:4b"]);
+    } else {
+      if (!hasModel(models, "gemma3")) tips.push(["The photo reader is missing. Run:", "ollama pull gemma3:4b"]);
+      if (!hasModel(models, "listsmart-writer") && !hasModel(models, "qwen3")) {
+        tips.push(["The listing writer is missing. Build listsmart-writer (see finetune/README.md), or for now run:",
+          "ollama pull qwen3:8b"]);
+        tips.push(["…and start the backend with:", "OLLAMA_WRITER_MODEL=qwen3:8b"]);
+      }
+    }
+    if (!tips.length) { box.hidden = true; return; }
+
+    box.appendChild(el("h2", "card-title", "Finish local setup"));
+    box.appendChild(el("p", "muted small", "Until then the app uses hosted or sample (mock) models, so results may not be private."));
+    const ul = el("ul", "hint-list");
+    tips.forEach(([text, cmd]) => {
+      const li = el("li");
+      li.append(text + " ", el("code", "", cmd));
+      ul.appendChild(li);
+    });
+    box.appendChild(ul);
+    box.hidden = false;
+  }
+
+  // ---------- Private mode toggle ----------
+  const offlineToggle = $("offline-toggle");
+  const savedChoice = loadPrivateChoice();
+  if (savedChoice !== null) offlineToggle.checked = savedChoice;
+  offlineToggle.addEventListener("change", () => {
+    savePrivateChoice(offlineToggle.checked);
+    updateStepLabels();
+  });
+
+  // Loading step labels change with the mode, so the seller knows what runs where
+  function updateStepLabels() {
+    const h = health || {};
+    const vision = h.vision_backend || "";
+    const writer = h.writer_backend || "";
+    $("step-vision").textContent = vision === "ollama" ? "Reading photos with Gemma 3 on your laptop…"
+      : vision === "mock" ? "Reading photos (sample mode)…" : "Reading photos with Gemma…";
+    $("step-writer").textContent = writer === "ollama" ? "Writing listing with our fine-tuned Qwen3 on your laptop…"
+      : writer === "tinker" ? "Writing listing with our fine-tuned model (Tinker)…" : "Writing listing…";
+    $("step-pricing").textContent = offlineToggle.checked
+      ? "Skipping competitor prices (private mode, nothing sent online)"
+      : "Checking competitor prices on Google Shopping…";
   }
 
   // ---------- Photo picking ----------
@@ -262,13 +371,15 @@
     const items = box.querySelectorAll("li");
     box.hidden = false;
     let step = 0;
+    // Local models on a laptop are slower than hosted ones, so move the labels more slowly
+    const local = health && (health.vision_backend === "ollama" || health.writer_backend === "ollama");
     const paint = () => items.forEach((li, i) => {
       li.className = i < step ? "done" : i === step ? "active" : "";
     });
     paint();
     stepTimer = setInterval(() => {
       if (step < items.length - 1) { step += 1; paint(); }
-    }, 3500);
+    }, local ? 7000 : 3500);
   }
   function stopProgress(success) {
     clearInterval(stepTimer);
@@ -299,8 +410,20 @@
         // Pretend to work for a few seconds so the loading steps are visible
         await sleep(3000);
         data = JSON.parse(JSON.stringify(MOCK_RESULT));
+        data.request_id = "demo-" + Date.now();
         const cost = parseFloat($("cost-price").value);
-        if (cost > 0) {
+        if (offlineToggle.checked) {
+          // Private mode: no competitor search, so the price comes only from the cost price
+          data.meta.pricing_source = "skipped";
+          data.meta.timings_ms.pricing = 0;
+          data.pricing.competitors = [];
+          data.pricing.stats = {};
+          data.pricing.suggested_price = cost > 0 ? Math.ceil((cost * 1.25 + 1) / 10) * 10 - 1 : null;
+          data.pricing.strategy = cost > 0
+            ? "Private mode: competitor prices were not checked. This is your cost price plus at least 25%, ending in 9."
+            : "Private mode: competitor prices were not checked. Add your cost price to get a suggestion.";
+        }
+        if (cost > 0 && typeof data.pricing.suggested_price === "number") {
           data.pricing.margin_pct = Math.round(((data.pricing.suggested_price - cost) / cost) * 100);
         }
       } else {
@@ -312,6 +435,8 @@
         if (notes) form.append("notes", notes);
         const cost = $("cost-price").value.trim();
         if (cost) form.append("cost_price", cost);
+        // Always send the toggle so it overrides the server's OFFLINE_MODE setting
+        form.append("offline", offlineToggle.checked ? "true" : "false");
 
         const res = await fetch("/api/generate", { method: "POST", body: form });
         if (!res.ok) {
@@ -348,15 +473,64 @@
 
     renderAttributes(data.attributes || {});
     renderListing(data.listing || {});
-    renderPricing(data.pricing || {});
+    renderPricing(data.pricing || {}, data.meta || {});
 
     const meta = data.meta || {};
     const parts = [];
     if (meta.writer_backend) parts.push("Writer: " + meta.writer_backend);
     if (typeof meta.latency_ms === "number") parts.push((meta.latency_ms / 1000).toFixed(1) + " s");
     $("meta").textContent = parts.join(" · ");
+    renderPrivacyStrip(meta);
+    resetFeedback(data.request_id);
 
     section.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  // Who received data for each online service (in plain words)
+  function leftDeviceText(service, meta) {
+    if (service === "serpapi") return "SerpApi: search query only (no photos)";
+    // "gemma_api" gets the photos only when it read them; as the writer it only gets text
+    if (service === "gemma_api") {
+      return meta.vision_backend === "gemma_api" ? "Google AI Studio: your photos" : "Google AI Studio: product details text";
+    }
+    if (service === "tinker") return "Tinker: product details text";
+    return service;
+  }
+
+  // "Ran locally ✓ · Data that left this device: none · Cost: ₹0.00 · timings"
+  function renderPrivacyStrip(meta) {
+    const box = $("privacy-strip");
+    box.textContent = "";
+    const items = [];
+
+    if (typeof meta.ran_locally === "boolean") {
+      items.push(meta.ran_locally
+        ? ["good", "Ran locally ✓", "Photos read by " + (meta.vision_backend || "?") + ", listing written by " + (meta.writer_backend || "?")]
+        : ["warn", "Partly hosted", "Photos: " + (meta.vision_backend || "?") + ", writer: " + (meta.writer_backend || "?")]);
+    }
+    if (Array.isArray(meta.data_left_device)) {
+      const left = meta.data_left_device;
+      items.push([left.length ? "warn" : "good", "Data that left this device",
+        left.length ? left.map((k) => leftDeviceText(k, meta)).join("; ") : "none"]);
+    }
+    if (typeof meta.cost_inr === "number") {
+      items.push([meta.cost_inr === 0 ? "good" : "", "Cost", "₹" + meta.cost_inr.toFixed(2)]);
+    }
+    const t = meta.timings_ms;
+    if (t && typeof t === "object") {
+      const sec = (ms) => (ms / 1000).toFixed(1) + " s";
+      const steps = [["Photos", t.vision], ["Writing", t.writer], ["Prices", t.pricing]]
+        .filter(([, ms]) => typeof ms === "number")
+        .map(([name, ms]) => name + " " + (name === "Prices" && meta.pricing_source === "skipped" ? "skipped" : sec(ms)));
+      if (steps.length) items.push(["", "Time", steps.join(" · ")]);
+    }
+
+    items.forEach(([tone, label, value]) => {
+      const item = el("div", "ps-item" + (tone ? " " + tone : ""));
+      item.append(el("span", "ps-label", label), el("span", "ps-value", value));
+      box.appendChild(item);
+    });
+    box.hidden = items.length === 0; // older backends do not send these fields
   }
 
   function renderAttributes(attrs) {
@@ -481,10 +655,135 @@
       text += "\n\nSUGGESTED PRICE\n" + formatINR(lastResult.pricing.suggested_price);
     }
     copyText(text, "Full listing");
+    // Copying everything is a strong sign the seller is going to use it
+    markUsed();
   });
 
+  // ---------- Feedback ----------
+  // Each click sends one small record. A record only carries the thing that just happened
+  // (a rating, "used", or the survey answers), so the summary counts each action once.
+  function resetFeedback(requestId) {
+    feedbackState = { request_id: requestId || "", rating: null, used: false, surveyed: false };
+    ["fb-up", "fb-down", "fb-used"].forEach((id) => {
+      $(id).setAttribute("aria-pressed", "false");
+      $(id).disabled = false;
+    });
+    $("pay-form").reset();
+    $("pay-form").hidden = false;
+    $("fb-thanks").textContent = "";
+    $("fb-error").hidden = true;
+  }
+
+  async function sendFeedback(part, thanks) {
+    const record = Object.assign({
+      request_id: feedbackState ? feedbackState.request_id : "",
+      rating: null, used: false, would_pay: null, price_ok_inr: null, comment: "",
+      listing: readListing() // the listing as the seller edited it
+    }, part);
+    $("fb-error").hidden = true;
+    try {
+      if (DEMO) {
+        demoFeedback.push(record);
+      } else {
+        const res = await fetch("/api/feedback", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(record)
+        });
+        if (!res.ok) throw new Error("HTTP " + res.status);
+      }
+      $("fb-thanks").textContent = thanks;
+      loadFeedbackSummary();
+      return true;
+    } catch (e) {
+      $("fb-error").textContent = "Could not save feedback (" + e.message + "). Please try again.";
+      $("fb-error").hidden = false;
+      return false;
+    }
+  }
+
+  // Thumbs up / down. Clicking the same one again does nothing.
+  function rate(value) {
+    if (!feedbackState || feedbackState.rating === value) return;
+    feedbackState.rating = value;
+    $("fb-up").setAttribute("aria-pressed", String(value === "up"));
+    $("fb-down").setAttribute("aria-pressed", String(value === "down"));
+    sendFeedback({ rating: value }, value === "up" ? "Thanks! Glad it helped." : "Thanks — tell us below what was wrong.");
+  }
+  $("fb-up").addEventListener("click", () => rate("up"));
+  $("fb-down").addEventListener("click", () => rate("down"));
+
+  // "I used this listing" is only sent once per result
+  function markUsed() {
+    if (!feedbackState || feedbackState.used) return;
+    feedbackState.used = true;
+    $("fb-used").setAttribute("aria-pressed", "true");
+    $("fb-used").disabled = true;
+    sendFeedback({ used: true }, "Thanks! Good luck with the sale.");
+  }
+  $("fb-used").addEventListener("click", markUsed);
+
+  // "Would you pay for this?" form
+  $("pay-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    if (!feedbackState) return;
+    const choice = document.querySelector('input[name="would_pay"]:checked');
+    const price = parseFloat($("pay-price").value);
+    const comment = $("pay-comment").value.trim();
+    if (!choice && !comment && !(price >= 0)) {
+      $("fb-error").textContent = "Pick yes, maybe or no, or write a comment.";
+      $("fb-error").hidden = false;
+      return;
+    }
+    $("pay-submit").disabled = true;
+    const ok = await sendFeedback({
+      would_pay: choice ? choice.value : null,
+      price_ok_inr: price >= 0 ? Math.min(price, 100000) : null, // backend accepts up to ₹1,00,000
+      comment: comment
+    }, "Thank you! Your answer really helps us decide what to build next.");
+    $("pay-submit").disabled = false;
+    if (ok) $("pay-form").hidden = true;
+  });
+
+  // Tiny counter in the footer, e.g. "Seller feedback so far: 12 · 👍 9 · used 7 · would pay 4"
+  async function loadFeedbackSummary() {
+    const box = $("fb-summary");
+    let sum;
+    try {
+      if (DEMO) {
+        sum = { count: demoFeedback.length, up: 0, down: 0, used: 0, would_pay: { yes: 0, maybe: 0, no: 0 } };
+        demoFeedback.forEach((f) => {
+          if (f.rating === "up") sum.up += 1;
+          if (f.rating === "down") sum.down += 1;
+          if (f.used) sum.used += 1;
+          if (f.would_pay) sum.would_pay[f.would_pay] += 1;
+        });
+      } else {
+        const res = await fetch("/api/feedback/summary");
+        if (!res.ok) throw new Error("HTTP " + res.status);
+        sum = await res.json();
+      }
+    } catch (e) {
+      box.textContent = ""; // older backend without feedback, just hide the counter
+      return;
+    }
+    const wp = sum.would_pay || {};
+    box.textContent = "Seller feedback so far: " + (sum.count || 0) + " responses · 👍 " + (sum.up || 0) +
+      " · 👎 " + (sum.down || 0) + " · used " + (sum.used || 0) +
+      " · would pay: yes " + (wp.yes || 0) + ", maybe " + (wp.maybe || 0) + ", no " + (wp.no || 0) +
+      (DEMO ? " (demo, not saved)" : "");
+  }
+
   // ---------- Pricing ----------
-  function renderPricing(p) {
+  function renderPricing(p, meta) {
+    // Tell the seller where the competitor prices came from
+    const note = $("pricing-note");
+    const source = (meta && meta.pricing_source) || "";
+    note.textContent = source === "skipped" ? "Private mode: competitor price check was skipped, nothing was searched online."
+      : source === "mock" ? "Sample competitor prices (no SerpApi key set), not live data."
+      : "";
+    note.hidden = !note.textContent;
+
     $("price-big").textContent = formatINR(p.suggested_price);
     $("margin").textContent = typeof p.margin_pct === "number"
       ? "About " + Math.round(p.margin_pct) + "% margin over your cost price."
@@ -496,6 +795,7 @@
     const s = p.stats || {};
     const dl = $("stats");
     dl.textContent = "";
+    dl.hidden = typeof s.median !== "number"; // no stats when the price check was skipped
     [["Min", s.min], ["P25", s.p25], ["Median", s.median], ["P75", s.p75], ["Max", s.max]].forEach(([name, v]) => {
       const wrap = el("div");
       wrap.append(el("dt", "", name), el("dd", "", formatINR(v)));
@@ -504,7 +804,7 @@
 
     const comps = (p.competitors || []).filter((c) => typeof c.price === "number" && isFinite(c.price));
     renderStrip(comps, s, p.suggested_price);
-    renderCompetitors(comps);
+    renderCompetitors(comps, meta);
   }
 
   // Draw a simple dot plot: one dot per competitor price, the busy middle (P25-P75)
@@ -552,11 +852,12 @@
       formatINR(Math.max.apply(null, prices)) + ". Suggested price " + formatINR(suggested) + ".");
   }
 
-  function renderCompetitors(comps) {
+  function renderCompetitors(comps, meta) {
     const ul = $("competitors");
     ul.textContent = "";
     if (!comps.length) {
-      ul.appendChild(el("li", "muted", "No competitor prices found."));
+      const skipped = meta && meta.pricing_source === "skipped";
+      ul.appendChild(el("li", "muted", skipped ? "Not checked in private mode." : "No competitor prices found."));
       return;
     }
     // Cheapest first
@@ -680,6 +981,9 @@
       body.appendChild(legend);
     }
 
+    renderSpeed(body, ev.speed);
+    renderCost(body, ev.cost_per_1000_listings_inr);
+
     // One example, side by side
     const ex = (ev.examples || [])[0];
     if (ex) {
@@ -688,6 +992,64 @@
       grid.append(exampleBox("Base model", ex.base, ""), exampleBox("Fine-tuned", ex.finetuned, "ft"));
       body.appendChild(grid);
     }
+  }
+
+  // Build a small table from a header row and body rows (first cell of each row is a row header)
+  function simpleTable(headers, rows) {
+    const wrap = el("div", "table-wrap");
+    const table = el("table");
+    const thead = el("thead");
+    const hr = el("tr");
+    headers.forEach((h, i) => {
+      const th = el("th", i ? "num" : "", h);
+      th.scope = "col";
+      hr.appendChild(th);
+    });
+    thead.appendChild(hr);
+    const tbody = el("tbody");
+    rows.forEach((cells) => {
+      const tr = el("tr");
+      cells.forEach((c, i) => {
+        if (i === 0) {
+          const th = el("th", "", c);
+          th.scope = "row";
+          tr.appendChild(th);
+        } else {
+          tr.appendChild(el("td", "num", c));
+        }
+      });
+      tbody.appendChild(tr);
+    });
+    table.append(thead, tbody);
+    wrap.appendChild(table);
+    return wrap;
+  }
+
+  // Speed on the laptop: seconds per listing and tokens per second, base vs fine-tuned
+  function renderSpeed(body, speed) {
+    if (!speed || typeof speed !== "object") return;
+    const num = (v, digits, unit) => (typeof v === "number" ? v.toFixed(digits) + unit : "–");
+    const rows = [["Base", speed.base], ["Fine-tuned", speed.finetuned]]
+      .filter(([, v]) => v && typeof v === "object")
+      .map(([name, v]) => [name, num(v.median_latency_s, 1, " s"), num(v.tokens_per_s, 1, "")]);
+    if (!rows.length) return;
+    body.appendChild(el("h3", "sub-title", "Speed on a laptop"));
+    if (speed.hardware) body.appendChild(el("p", "small muted", "Hardware: " + speed.hardware));
+    body.appendChild(simpleTable(["Model", "Median time per listing", "Tokens / second"], rows));
+  }
+
+  // Cost of 1,000 listings: local (₹0) vs hosted fine-tune vs a closed API
+  function renderCost(body, cost) {
+    if (!cost || typeof cost !== "object") return;
+    const rupees = (v) => (typeof v === "number" ? "₹" + v.toLocaleString("en-IN", { maximumFractionDigits: 2 }) : "not measured");
+    const rows = [
+      ["On your laptop (Ollama)", cost.local],
+      ["Hosted fine-tune (Tinker)", cost.tinker_hosted],
+      ["Closed model API", cost.closed_api]
+    ].filter(([, v]) => v !== undefined).map(([name, v]) => [name, rupees(v)]);
+    if (!rows.length) return;
+    body.appendChild(el("h3", "sub-title", "Cost of 1,000 listings"));
+    body.appendChild(simpleTable(["Where it runs", "Cost (INR)"], rows));
   }
 
   // "format_valid" -> "Format valid"
@@ -726,6 +1088,8 @@
 
   // ---------- Start ----------
   if (DEMO) $("demo-banner").hidden = false;
+  updateStepLabels();
   loadHealth();
   loadEval();
+  loadFeedbackSummary();
 })();

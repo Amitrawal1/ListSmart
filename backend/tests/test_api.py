@@ -30,7 +30,7 @@ def test_generate_mock():
     )
     assert r.status_code == 200, r.text
     body = r.json()
-    assert set(body) == {"attributes", "listing", "pricing", "meta"}
+    assert set(body) == {"request_id", "attributes", "listing", "pricing", "meta"}
     assert body["meta"]["writer_backend"] == "mock"
     assert len(body["listing"]["bullets"]) == 5
     p = body["pricing"]

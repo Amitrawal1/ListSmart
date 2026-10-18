@@ -1,7 +1,13 @@
-"""Step 1: Gemma looks at product photos and returns ProductAttributes JSON."""
+"""Step 1: Gemma looks at product photos and returns ProductAttributes JSON.
 
+Backends (env VISION_BACKEND): ollama (gemma3:4b on this laptop) -> gemma_api (hosted) -> mock.
+"""
+
+import base64
+import io
 import logging
 
+from . import ollama_client
 from .config import Settings
 from .llm_utils import extract_json_object, get_genai_client
 
@@ -77,27 +83,77 @@ def mock_attributes() -> dict:
                 key_features=list(MOCK_ATTRIBUTES["key_features"]))
 
 
+def _to_ollama_image(data: bytes, mime: str) -> str:
+    """Base64 text for Ollama. WEBP is turned into PNG because not every Ollama build reads it."""
+    if mime == "image/webp":
+        try:
+            from PIL import Image
+
+            buf = io.BytesIO()
+            Image.open(io.BytesIO(data)).convert("RGB").save(buf, format="PNG")
+            data = buf.getvalue()
+        except Exception as exc:  # Pillow missing or bad file -> send it as it is
+            log.warning("could not convert webp to png: %s", exc)
+    return base64.b64encode(data).decode("ascii")
+
+
+def ollama_attributes(images: list[tuple[bytes, str]], settings: Settings) -> dict:
+    """Local Gemma 3 (via Ollama) reads the photos. Nothing leaves the laptop."""
+    payload = {
+        "model": settings.ollama_vision_model,
+        "messages": [{
+            "role": "user",
+            "content": VISION_PROMPT,
+            "images": [_to_ollama_image(data, mime) for data, mime in images],
+        }],
+        # Ollama can force valid JSON output; low temperature keeps it factual
+        "format": "json",
+        "stream": False,
+        "options": {"temperature": 0.2, "num_predict": 800},
+    }
+    reply = ollama_client.post(settings.ollama_host, "/api/chat", payload)
+    text = (reply.get("message") or {}).get("content", "")
+    return normalize_attributes(extract_json_object(text))
+
+
+def gemma_api_attributes(images: list[tuple[bytes, str]], settings: Settings) -> dict:
+    """Hosted Gemma (Google AI Studio) reads the photos."""
+    from google.genai import types
+
+    client = get_genai_client(settings)
+    # Images first, then the instructions, all in one user turn
+    parts = [types.Part.from_bytes(data=data, mime_type=mime) for data, mime in images]
+    parts.append(types.Part.from_text(text=VISION_PROMPT))
+    response = client.models.generate_content(
+        model=settings.gemma_model,
+        contents=[types.Content(role="user", parts=parts)],
+        config=types.GenerateContentConfig(temperature=0.2, max_output_tokens=800),
+    )
+    return normalize_attributes(extract_json_object(response.text or ""))
+
+
+def vision_chain(settings: Settings) -> list[str]:
+    """Backends to try in order. Offline mode drops the hosted one."""
+    chain = {"ollama": ["ollama", "gemma_api"], "gemma_api": ["gemma_api"], "mock": []}
+    steps = chain[settings.vision_backend]
+    if settings.offline_mode:
+        steps = [b for b in steps if b == "ollama"]
+    return steps
+
+
 def extract_attributes(images: list[tuple[bytes, str]], settings: Settings) -> tuple[dict, str]:
-    """Return (attributes, source) where source is "gemma" or "mock".
+    """Return (attributes, source) where source is "ollama", "gemma_api" or "mock".
 
     images is a list of (raw_bytes, mime_type). Blocking call: run it in a thread.
     """
-    if not settings.has_gemma:
-        return mock_attributes(), "mock"
-
-    try:
-        from google.genai import types
-
-        client = get_genai_client(settings)
-        # Images first, then the instructions, all in one user turn
-        parts = [types.Part.from_bytes(data=data, mime_type=mime) for data, mime in images]
-        parts.append(types.Part.from_text(text=VISION_PROMPT))
-        response = client.models.generate_content(
-            model=settings.gemma_model,
-            contents=[types.Content(role="user", parts=parts)],
-            config=types.GenerateContentConfig(temperature=0.2, max_output_tokens=800),
-        )
-        return normalize_attributes(extract_json_object(response.text or "")), "gemma"
-    except Exception as exc:  # any network / parse error -> keep the app working
-        log.warning("Gemma vision failed, using mock attributes: %s", exc)
-        return mock_attributes(), "mock"
+    for backend in vision_chain(settings):
+        try:
+            if backend == "ollama":
+                return ollama_attributes(images, settings), "ollama"
+            if backend == "gemma_api":
+                if not settings.has_gemma:
+                    raise RuntimeError("GOOGLE_API_KEY not set")
+                return gemma_api_attributes(images, settings), "gemma_api"
+        except Exception as exc:  # any network / parse error -> try the next one
+            log.warning("vision backend %s failed, falling back: %s", backend, exc)
+    return mock_attributes(), "mock"

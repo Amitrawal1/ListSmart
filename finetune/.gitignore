@@ -7,3 +7,5 @@ data/train.jsonl
 data/val.jsonl
 # Mock outputs from evaluate.py --dry-run
 results/dry_run/
+# export_to_ollama.py output (LoRA download, llama.cpp checkout, multi-GB GGUF files)
+export/

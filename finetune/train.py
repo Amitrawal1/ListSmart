@@ -47,6 +47,8 @@ def parse_args():
     p.add_argument("--max-steps", type=int, default=None, help="stop early after N steps (for quick tests)")
     p.add_argument("--name", default="listsmart-writer", help="name for the saved sampler weights")
     p.add_argument("--seed", type=int, default=0)
+    p.add_argument("--no-external", action="store_true",
+                   help="do not also save downloadable external weights (used by export_to_ollama.py)")
     p.add_argument("--dry-run", action="store_true", help="build datums locally and print stats, no Tinker calls")
     return p.parse_args()
 
@@ -200,8 +202,21 @@ def main():
     print(f"\nSaved fine-tuned sampler weights: {model_path}")
 
     (RESULTS_DIR / "finetuned_model.txt").write_text(model_path + "\n")
+
+    # Also save a downloadable copy for running the model locally (export_to_ollama.py).
+    # Tinker marks the old archive download as deprecated; save_weights_external is the new way.
+    external_path = None
+    if not args.no_external:
+        try:
+            external_path = training_client.save_weights_external(name=args.name).result().path
+            (RESULTS_DIR / "external_weights.txt").write_text(external_path + "\n")
+            print(f"Saved external (downloadable) weights: {external_path}")
+        except Exception as err:  # noqa: BLE001 - never lose a finished run over this optional step
+            print(f"WARNING: save_weights_external failed ({err.__class__.__name__}: {str(err)[:200]}). "
+                  "export_to_ollama.py will try the sampler archive download instead.")
     info = {
         "finetuned_model": model_path,
+        "external_weights": external_path,
         "base_model": args.base_model,
         "renderer": renderer_name,
         "lora_rank": args.lora_rank,

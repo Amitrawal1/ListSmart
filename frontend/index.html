@@ -32,10 +32,13 @@
   <main id="main" class="wrap">
     <section class="hero">
       <h1>Write your product listing in one click</h1>
-      <p>Upload 1–5 photos. Gemma reads them, our fine-tuned writer drafts the listing,
-        and we check competitor prices on Google Shopping.</p>
+      <p>Upload 1–5 photos. Open models run on your own laptop: Gemma 3 reads the photos and our
+        fine-tuned Qwen3 writer drafts the listing. Your photos never leave this device and each listing costs ₹0.</p>
       <p id="demo-banner" class="demo-banner" hidden>Demo mode: using a built-in sample response, no backend needed.</p>
     </section>
+
+    <!-- Setup hint, shown only when Ollama or a model is missing -->
+    <div id="health-hint" class="card hint-card" role="status" hidden></div>
 
     <!-- Step 1: the input form -->
     <form id="gen-form" class="card form-card" novalidate>
@@ -77,6 +80,18 @@
         <textarea id="notes" name="notes" rows="3" maxlength="1000" placeholder="e.g. Pure cotton, sizes S to XXL, hand block printed in Jaipur"></textarea>
       </div>
 
+      <!-- Private mode: nothing at all is sent to the internet -->
+      <div class="field toggle-field">
+        <label class="switch" for="offline-toggle">
+          <input id="offline-toggle" type="checkbox" role="switch" aria-describedby="offline-help">
+          <span class="switch-track" aria-hidden="true"><span class="switch-thumb"></span></span>
+          <span class="switch-label">Private mode — runs on this laptop</span>
+        </label>
+        <p id="offline-help" class="muted small">Photos and listing writing always stay on your laptop when the local models are installed.
+          The only online step is the competitor price check (a short search text sent to Google Shopping via SerpApi).
+          Private mode skips that step, so nothing leaves this device.</p>
+      </div>
+
       <div class="form-actions">
         <button id="gen-btn" type="submit" class="btn btn-primary" disabled>Generate listing</button>
         <span id="form-hint" class="muted small">Add at least one photo to start.</span>
@@ -84,9 +99,10 @@
 
       <!-- Loading steps shown while the backend works -->
       <ol id="progress" class="progress" hidden aria-live="polite">
-        <li data-step="0">Reading photos with Gemma</li>
-        <li data-step="1">Writing listing</li>
-        <li data-step="2">Checking competitor prices</li>
+        <!-- app.js replaces these labels to match local / hosted / private mode -->
+        <li id="step-vision" data-step="0">Reading photos with Gemma…</li>
+        <li id="step-writer" data-step="1">Writing listing…</li>
+        <li id="step-pricing" data-step="2">Checking competitor prices…</li>
       </ol>
       <p id="gen-error" class="error" role="alert" hidden></p>
     </form>
@@ -100,6 +116,9 @@
           <button id="copy-all" type="button" class="btn">Copy all</button>
         </div>
       </div>
+
+      <!-- Privacy and cost of this one result (filled from the response "meta") -->
+      <div id="privacy-strip" class="privacy-strip" role="group" aria-label="Privacy and cost of this result"></div>
 
       <div class="card">
         <h3 class="card-title">What Gemma saw in your photos</h3>
@@ -154,6 +173,7 @@
         <!-- Pricing card -->
         <article class="card pricing-card" aria-labelledby="pricing-title">
           <h3 id="pricing-title" class="card-title">Suggested price</h3>
+          <p id="pricing-note" class="pricing-note small" hidden></p>
           <div class="price-big" id="price-big">–</div>
           <p id="margin" class="muted small"></p>
           <p id="strategy" class="strategy"></p>
@@ -163,18 +183,58 @@
           <ul id="competitors" class="competitors"></ul>
         </article>
       </div>
+
+      <!-- Feedback: helps us learn if sellers would really use and pay for this -->
+      <section id="feedback" class="card feedback-card" aria-labelledby="feedback-title">
+        <h3 id="feedback-title" class="card-title">Was this listing useful?</h3>
+        <div class="fb-row">
+          <button id="fb-up" type="button" class="btn fb-btn" aria-pressed="false"><span aria-hidden="true">👍</span> Good</button>
+          <button id="fb-down" type="button" class="btn fb-btn" aria-pressed="false"><span aria-hidden="true">👎</span> Not good</button>
+          <button id="fb-used" type="button" class="btn fb-btn" aria-pressed="false">I used this listing</button>
+        </div>
+
+        <form id="pay-form" class="pay-form" novalidate>
+          <fieldset class="field">
+            <legend class="label">Would you pay for this?</legend>
+            <div class="radio-row">
+              <label><input type="radio" name="would_pay" value="yes"> Yes</label>
+              <label><input type="radio" name="would_pay" value="maybe"> Maybe</label>
+              <label><input type="radio" name="would_pay" value="no"> No</label>
+            </div>
+          </fieldset>
+          <div class="form-grid">
+            <div class="field">
+              <label class="label" for="pay-price">A fair price per month <span class="muted">(optional, ₹)</span></label>
+              <div class="input-prefix">
+                <span aria-hidden="true">₹</span>
+                <input id="pay-price" type="number" inputmode="decimal" min="0" max="100000" step="1" placeholder="e.g. 199">
+              </div>
+            </div>
+            <div class="field">
+              <label class="label" for="pay-comment">What should we add next? <span class="muted">(optional)</span></label>
+              <textarea id="pay-comment" rows="2" maxlength="1000" placeholder="e.g. Hindi descriptions, bulk upload"></textarea>
+            </div>
+          </div>
+          <button id="pay-submit" type="submit" class="btn">Send feedback</button>
+        </form>
+        <p id="fb-thanks" class="fb-thanks" role="status" aria-live="polite"></p>
+        <p id="fb-error" class="error" role="alert" hidden></p>
+      </section>
     </section>
 
     <!-- Step 3: base vs fine-tuned evaluation -->
     <section id="eval" class="card eval-card" aria-labelledby="eval-title">
       <h2 id="eval-title" class="card-title">Base vs Fine-tuned writer</h2>
-      <p class="muted">Measured on a held-out test set the model never saw during training (LoRA fine-tune on Tinker).</p>
+      <p class="muted">Measured on a held-out test set the model never saw during training
+        (open Qwen3-8B + LoRA fine-tune trained on Tinker, then run on a laptop with Ollama).</p>
       <div id="eval-body"><p class="muted">Loading results…</p></div>
     </section>
   </main>
 
   <footer class="wrap footer muted small">
-    Built with Gemma, Tinker, SerpApi and Render.
+    <p>Built with open models (Gemma 3 vision + fine-tuned Qwen3-8B, trained on Tinker, run with Ollama), SerpApi and Render.</p>
+    <!-- Small running count of seller feedback -->
+    <p id="fb-summary" aria-live="polite"></p>
   </footer>
 
   <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>

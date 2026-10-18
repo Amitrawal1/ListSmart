@@ -101,3 +101,51 @@ floor at cost_price * 1.25; clamp inside [p25, p75] when possible. Explain in `s
 - Every external service must have an offline mock path so the app runs with zero keys.
 - Never commit secrets; read keys from env (.env via python-dotenv).
 - Do NOT run long training jobs; write scripts and document exact commands.
+
+---------------------------------------------------------------------------
+# Part 2 — Open-source / local-first (theme: "Side Hustle", open AI at the core)
+
+Goal: the whole AI pipeline runs on the seller's own laptop with open-weight models via
+**Ollama** (default), so photos never leave the device and each listing costs ₹0.
+Hosted paths (Gemma API, Tinker sampling) stay as fallbacks. Target machine: 8GB M1.
+
+## Models (Ollama)
+- Vision: `gemma3:4b` (env `OLLAMA_VISION_MODEL`), Ollama `/api/chat` with base64 `images`.
+- Writer (fine-tuned): `listsmart-writer` (env `OLLAMA_WRITER_MODEL`) = Qwen3-8B + our Tinker
+  LoRA, merged, GGUF Q4_K_M, created with `ollama create`.
+- Writer (base, for comparison): `qwen3:8b`.
+- `OLLAMA_HOST` default `http://localhost:11434`.
+
+## Exact prompt format for the local writer
+To match training token-for-token, the backend calls Ollama `/api/generate` with
+`raw: true` and a prompt built by `backend/app/chat_template.py`:
+- `build_raw_prompt(messages: list[dict]) -> str`
+- `STOP_STRINGS: list[str]`
+(finetune/ has a test proving it equals the tinker-cookbook `qwen3_disable_thinking` renderer.)
+
+## New/changed settings
+- `VISION_BACKEND`: `ollama` | `gemma_api` | `mock` (default `ollama`; falls back gemma_api -> mock)
+- `WRITER_BACKEND`: `ollama` | `tinker` | `gemma` | `mock` (default `ollama`; fallback order
+  ollama -> tinker -> gemma -> mock)
+- `OFFLINE_MODE`: `true` -> never call SerpApi (mock/none pricing), nothing leaves the device.
+
+## API changes (additive)
+- `POST /api/generate` new optional form field `offline` ("true"/"false", overrides OFFLINE_MODE).
+  `meta` adds: `vision_backend`, `pricing_source` ("serpapi"|"mock"|"skipped"),
+  `ran_locally` (bool: vision AND writer both ran via ollama/mock),
+  `data_left_device` (list of services that received data, e.g. ["serpapi"] or []),
+  `cost_inr` (estimated cost of this request: 0 for local; hosted from token counts),
+  `timings_ms` {"vision":..,"writer":..,"pricing":..}.
+- `GET /api/health` adds `ollama` (bool), `ollama_models` (list of model names present),
+  `vision_backend`, `offline_mode`.
+- `POST /api/feedback` JSON `{"request_id": str, "rating": "up"|"down"|null, "used": bool,
+  "would_pay": "yes"|"maybe"|"no"|null, "price_ok_inr": number|null, "comment": str,
+  "listing": {...}}` -> appends a line to `data/feedback.jsonl` (project root, gitignored),
+  returns `{"ok":true}`. `/api/generate` response gets top-level `request_id` (uuid4 hex).
+- `GET /api/feedback/summary` -> `{"count":n,"up":n,"down":n,"used":n,"would_pay":{"yes":n,"maybe":n,"no":n}}`.
+
+## Eval additions (finetune/)
+- `evaluate.py --backend ollama` runs base `qwen3:8b` vs `listsmart-writer` locally (use `--limit`).
+- Summary adds `"speed"`: `{"base":{"median_latency_s":..,"tokens_per_s":..},"finetuned":{...}, "hardware":"..."}`
+  and `"cost_per_1000_listings_inr"`: `{"local":0,"tinker_hosted":..,"closed_api":..|null}`.
+- Optional closed-model baseline (`--closed-baseline`), only if a key is set; never required.

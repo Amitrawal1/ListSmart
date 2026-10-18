@@ -1,12 +1,15 @@
 """Step 2: turn product attributes into a marketplace Listing.
 
-Backends (env WRITER_BACKEND): tinker (fine-tuned) -> gemma (base) -> mock.
-If the chosen backend fails we fall back down that chain and report what was used.
+Backends (env WRITER_BACKEND): ollama (fine-tuned, on this laptop) -> tinker (fine-tuned,
+hosted) -> gemma (base, hosted) -> mock. If the chosen backend fails we fall back down
+that chain and report what was used.
 """
 
 import logging
 import threading
 
+from . import ollama_client
+from .chat_template import STOP_STRINGS, build_raw_prompt
 from .config import Settings
 from .llm_utils import get_genai_client
 from .prompts import PLATFORM_RULES, build_writer_messages, parse_listing
@@ -70,6 +73,23 @@ def mock_listing(attributes: dict, platform: str = "meesho", notes: str = "") ->
         "tags": tags[: rules["tags_max"]],
         "search_query": search_query or product,
     }
+
+
+# ---------- ollama backend ----------
+
+def ollama_listing(attributes: dict, platform: str, notes: str, settings: Settings) -> dict:
+    """Local fine-tuned writer in Ollama, fed the exact prompt text used in training."""
+    messages = build_writer_messages(attributes, platform, notes)
+    payload = {
+        "model": settings.ollama_writer_model,
+        # raw=True: Ollama must not add its own chat template on top of ours
+        "prompt": build_raw_prompt(messages),
+        "raw": True,
+        "stream": False,
+        "options": {"temperature": 0.7, "num_predict": MAX_TOKENS, "stop": STOP_STRINGS},
+    }
+    reply = ollama_client.post(settings.ollama_host, "/api/generate", payload)
+    return parse_listing(reply.get("response", ""), platform)
 
 
 # ---------- gemma backend ----------
@@ -147,11 +167,26 @@ def tinker_listing(attributes: dict, platform: str, notes: str, settings: Settin
 
 # ---------- dispatcher ----------
 
+def writer_chain(settings: Settings) -> list[str]:
+    """Backends to try in order. Offline mode keeps only the on-device ones."""
+    chain = {
+        "ollama": ["ollama", "tinker", "gemma", "mock"],
+        "tinker": ["tinker", "gemma", "mock"],
+        "gemma": ["gemma", "mock"],
+        "mock": ["mock"],
+    }
+    steps = chain[settings.writer_backend]
+    if settings.offline_mode:
+        steps = [b for b in steps if b in ("ollama", "mock")]
+    return steps
+
+
 def write_listing(attributes: dict, platform: str, notes: str, settings: Settings) -> tuple[dict, str]:
     """Return (listing, backend_used). Blocking call: run it in a thread."""
-    chain = {"tinker": ["tinker", "gemma", "mock"], "gemma": ["gemma", "mock"], "mock": ["mock"]}
-    for backend in chain[settings.writer_backend]:
+    for backend in writer_chain(settings):
         try:
+            if backend == "ollama":
+                return ollama_listing(attributes, platform, notes, settings), "ollama"
             if backend == "tinker":
                 if not settings.has_tinker:
                     raise RuntimeError("TINKER_API_KEY / TINKER_MODEL_PATH not set")

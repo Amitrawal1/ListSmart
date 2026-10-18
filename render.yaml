@@ -14,9 +14,16 @@ services:
     envVars:
       - key: PYTHON_VERSION
         value: 3.11.9
-      # Which writer to use: tinker (fine-tuned), gemma (base) or mock (offline)
+      # Render has no Ollama (no GPU, little RAM), so the cloud demo uses the hosted paths.
+      # Photos are read by hosted Gemma; the listing is written by our fine-tune on Tinker
+      # (falls back to gemma, then mock, if the Tinker keys are missing).
+      - key: VISION_BACKEND
+        value: gemma_api
       - key: WRITER_BACKEND
-        value: gemma
+        value: tinker
+      # Hosted demo is allowed to call SerpApi for live competitor prices
+      - key: OFFLINE_MODE
+        value: "false"
       - key: GEMMA_MODEL
         value: gemma-3-27b-it
       # Secrets: Render asks you to paste these when you create the Blueprint

@@ -46,6 +46,9 @@
 
 * { box-sizing: border-box; }
 
+/* Make the "hidden" attribute always win, even over display:flex/grid rules below */
+[hidden] { display: none !important; }
+
 html, body { margin: 0; }
 
 body {
@@ -272,6 +275,48 @@ td.num, th.num { text-align: right; }
 }
 
 .footer { padding: 10px 16px 30px; }
+
+/* ---------- Local setup hint ---------- */
+.hint-card { border-color: var(--warn); background: var(--warn-soft); }
+.hint-card .card-title { color: var(--warn); }
+.hint-list { margin: 8px 0 0; padding-left: 20px; display: grid; gap: 6px; }
+code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: .88em; background: var(--surface-2); border: 1px solid var(--border); border-radius: 6px; padding: 1px 6px; overflow-wrap: anywhere; }
+
+/* ---------- Private mode switch ---------- */
+.toggle-field { background: var(--surface-2); border-radius: 10px; padding: 12px 14px; }
+.toggle-field p { margin: 6px 0 0; }
+.switch { display: inline-flex; align-items: center; gap: 10px; cursor: pointer; font-weight: 600; }
+.switch input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.switch-track { position: relative; width: 44px; height: 24px; border-radius: 999px; background: var(--border); flex: none; transition: background .15s; }
+.switch-thumb { position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; border-radius: 50%; background: var(--surface); box-shadow: 0 1px 2px rgba(0, 0, 0, .3); transition: transform .15s; }
+.switch input:checked + .switch-track { background: var(--good); }
+.switch input:checked + .switch-track .switch-thumb { transform: translateX(20px); }
+.switch input:focus-visible + .switch-track { outline: 3px solid var(--focus); outline-offset: 2px; }
+@media (prefers-reduced-motion: reduce) { .switch-track, .switch-thumb { transition: none; } }
+
+/* ---------- Privacy / cost strip ---------- */
+.privacy-strip { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 16px; }
+.ps-item { display: flex; flex-direction: column; padding: 8px 12px; border-radius: 10px; background: var(--surface); border: 1px solid var(--border); min-width: 0; }
+.ps-item.good { background: var(--good-soft); border-color: transparent; }
+.ps-item.warn { background: var(--warn-soft); border-color: transparent; }
+.ps-label { font-size: .72rem; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+.ps-value { font-weight: 700; font-size: .9rem; overflow-wrap: anywhere; }
+.ps-item.good .ps-value { color: var(--good); }
+.ps-item.warn .ps-value { color: var(--warn); }
+
+.pricing-note { background: var(--warn-soft); color: var(--warn); border-radius: 8px; padding: 6px 10px; margin: 0 0 8px; }
+
+/* ---------- Feedback ---------- */
+.feedback-card { margin-top: 20px; }
+.fb-row { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 16px; }
+.fb-btn[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent); color: var(--text); }
+.fb-btn:disabled[aria-pressed="true"] { opacity: 1; cursor: default; }
+.radio-row { display: flex; gap: 18px; flex-wrap: wrap; }
+.radio-row label { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
+.radio-row input { width: 18px; height: 18px; accent-color: var(--accent); }
+.fb-thanks { color: var(--good); font-weight: 600; margin: 10px 0 0; }
+.fb-thanks:empty { display: none; }
+.footer p { margin: 0 0 4px; }
 
 /* ---------- Phones and small tablets ---------- */
 @media (max-width: 820px) {

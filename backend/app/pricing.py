@@ -177,10 +177,22 @@ def fetch_serpapi(query: str, api_key: str, timeout: float = 15) -> list[dict]:
 
 
 def get_pricing(query: str, settings: Settings, cost_price: float | None = None) -> tuple[dict, str]:
-    """Return (pricing dict per SPEC, source) where source is "serpapi" or "mock"."""
+    """Return (pricing dict per SPEC, source): "serpapi", "mock", or "skipped" when offline."""
     query = (query or "").strip() or "product"
     source = "mock"
     competitors: list[dict] = []
+    # Offline mode: no competitor search at all, price from the seller's cost only
+    if settings.offline_mode:
+        suggested, reasons = suggest_price(compute_stats([]), cost_price)
+        reasons.insert(0, "Offline mode is on, so we skipped the live competitor price search.")
+        return {
+            "currency": "INR",
+            "competitors": [],
+            "stats": compute_stats([]),
+            "suggested_price": suggested,
+            "strategy": " ".join(reasons),
+            "margin_pct": margin_pct(suggested, cost_price),
+        }, "skipped"
     if settings.has_serpapi:
         try:
             competitors = fetch_serpapi(query, settings.serpapi_key)
