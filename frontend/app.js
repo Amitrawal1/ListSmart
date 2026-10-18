@@ -224,6 +224,9 @@
       pill.title = live ? name + " is connected" : name + " key missing, using offline mock";
       box.appendChild(pill);
     });
+    // The top bar only has room for two pills, so list every service in the hover text too
+    box.title = [["Gemma API", h.gemma], ["SerpApi", h.serpapi], ["Tinker", h.tinker], ["Ollama", h.ollama]]
+      .map(([name, live]) => name + ": " + (live ? "live" : "off / mock")).join("\n");
 
     renderHealthHint(h);
 
@@ -467,10 +470,23 @@
   // When the platform changes, update the title counter limit
   document.querySelectorAll('input[name="platform"]').forEach((r) => r.addEventListener("change", updateTitleCount));
 
+  // Make a text box exactly as tall as its text, so nothing is hidden behind a scrollbar
+  function autoGrow(ta) {
+    ta.style.height = "auto";
+    ta.style.height = ta.scrollHeight + 2 + "px";
+  }
+  // Keep growing (or shrinking) while the seller edits any result field
+  document.addEventListener("input", (e) => {
+    if (e.target.matches && e.target.matches("#results textarea")) autoGrow(e.target);
+  });
+
   // ---------- Results ----------
   function renderResults(data) {
     const section = $("results");
     section.hidden = false;
+    // Hide the "your listing will appear here" placeholder
+    const empty = document.getElementById("empty-state");
+    if (empty) empty.hidden = true;
 
     renderAttributes(data.attributes || {});
     renderListing(data.listing || {});
@@ -483,6 +499,8 @@
     $("meta").textContent = parts.join(" · ");
     renderPrivacyStrip(meta);
     resetFeedback(data.request_id);
+    // Wait one frame so the cards are visible, then fit every box to its text
+    requestAnimationFrame(() => section.querySelectorAll("textarea").forEach(autoGrow));
 
     section.scrollIntoView({ behavior: "smooth", block: "start" });
   }
