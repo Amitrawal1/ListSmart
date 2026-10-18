@@ -1,0 +1,34 @@
+# Render Blueprint for ListSmart.
+# One Python web service: FastAPI runs the API and also serves the frontend/ folder.
+# Docs: https://render.com/docs/blueprint-spec
+services:
+  - type: web
+    name: listsmart
+    runtime: python
+    plan: free
+    # Build and start from the repo root so backend/ can find ../frontend and ../finetune/results
+    buildCommand: pip install -r backend/requirements.txt
+    startCommand: cd backend && uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /api/health
+    autoDeployTrigger: commit
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.9
+      # Which writer to use: tinker (fine-tuned), gemma (base) or mock (offline)
+      - key: WRITER_BACKEND
+        value: gemma
+      - key: GEMMA_MODEL
+        value: gemma-3-27b-it
+      # Secrets: Render asks you to paste these when you create the Blueprint
+      - key: GOOGLE_API_KEY
+        sync: false
+      - key: SERPAPI_KEY
+        sync: false
+      - key: TINKER_API_KEY
+        sync: false
+      - key: TINKER_MODEL_PATH
+        sync: false
+      - key: TINKER_BASE_MODEL
+        value: Qwen/Qwen3-8B
+      - key: TINKER_RENDERER
+        value: qwen3_disable_thinking

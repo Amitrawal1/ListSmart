@@ -1,0 +1,9 @@
+.venv/
+__pycache__/
+.pytest_cache/
+.env
+# Full dataset is rebuilt by prepare_data.py; only the small samples are kept in git
+data/train.jsonl
+data/val.jsonl
+# Mock outputs from evaluate.py --dry-run
+results/dry_run/

@@ -1,0 +1,11 @@
+# Tinker SDK + the official cookbook (renderers, tokenizers, SFT helpers)
+tinker==0.34.0
+tinker-cookbook==0.5.7
+# Data download (streams JSONL straight from the HuggingFace Hub)
+requests>=2.31
+# Eval metrics + LLM judge
+rouge-score==0.1.2
+google-genai>=1.0
+python-dotenv>=1.0
+# Tests
+pytest>=8.0

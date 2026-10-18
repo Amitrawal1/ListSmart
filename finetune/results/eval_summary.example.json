@@ -1,0 +1,136 @@
+{
+  "note": "example placeholder, run evaluate.py for real numbers",
+  "available": true,
+  "base_model": "Qwen/Qwen3-8B",
+  "finetuned_model": "tinker://EXAMPLE-PLACEHOLDER/sampler_weights/listsmart-writer",
+  "n_test": 120,
+  "metrics": {
+    "format_valid": {
+      "base": 0.71,
+      "finetuned": 0.98
+    },
+    "constraint_compliance": {
+      "base": 0.38,
+      "finetuned": 0.91
+    },
+    "title_length_ok": {
+      "base": 0.62,
+      "finetuned": 0.97
+    },
+    "bullets_exactly_5": {
+      "base": 0.66,
+      "finetuned": 0.98
+    },
+    "tags_ok": {
+      "base": 0.55,
+      "finetuned": 0.95
+    },
+    "description_paragraphs_ok": {
+      "base": 0.6,
+      "finetuned": 0.96
+    },
+    "search_query_ok": {
+      "base": 0.64,
+      "finetuned": 0.97
+    },
+    "attribute_coverage": {
+      "base": 0.58,
+      "finetuned": 0.69
+    },
+    "rouge_l": {
+      "base": 0.18,
+      "finetuned": 0.31
+    }
+  },
+  "judge": {
+    "finetuned_win": 0.64,
+    "base_win": 0.22,
+    "tie": 0.14,
+    "n": 120,
+    "auto_decided": 31
+  },
+  "examples": [
+    {
+      "platform": "meesho",
+      "attributes": {
+        "product_type": "napkin",
+        "category": "Event & Party Supplies Tableware",
+        "colors": [],
+        "material": "wood",
+        "pattern": "",
+        "style": "elegant",
+        "gender": "",
+        "key_features": [
+          "20-Count package of sturdy 3-ply lunch napkins",
+          "Folded size",
+          "Nature speaks softly in the subtle colors",
+          "Group together with coordinating plates and trays",
+          "Look to for luxurious"
+        ],
+        "visible_text": "",
+        "condition": "new"
+      },
+      "base": {
+        "invalid_output": "Sure! Here's a listing for your product:\n\n**Title:** 20-Count 3-Ply Paper Luncheon Napkins, Into the Woods\n\n**Description:** ...",
+        "error": "no JSON object found in model output"
+      },
+      "finetuned": {
+        "title": "20-Count 3-Ply Paper Luncheon Napkins, Into the Woods",
+        "description": "Add an exquisite designer touch to your special brunch, dinner or cocktail party with ' decorative napkins. Our soft, triple-ply paper napkins come in 3 sizes - cocktail, guest/hostess and luncheon.\n\nCoordinate with our other paper items in a wide array of stunning designs to create an elegant, festive mood. Created by Bruce & Deborah Michel in the early 1980s, ' paper goods, trays, tinware, and melamine allow you to set a beautiful table without a lot of fuss.\n\nBest of all, they are as easy to care for as they are elegant. Making this kind of hospitality simple and fun is a big part of what we are all about.\n\nAnd look beyond the dining table to fully experience the brand. We welcome you lather up with our English soaps, enjoy the ambiance of our scented candles and end your day with a wonderfully fragrant bubble bath.",
+        "bullets": [
+          "20-Count package of sturdy 3-ply lunch napkins",
+          "Folded size: 6.5 x 6.5-inches",
+          "Nature speaks softly in the subtle colors, peaceful setting, and leafy green fragrance of this timeless design",
+          "Group together with coordinating plates and trays",
+          "Look to for luxurious, all-natural bath and body products and beautiful home and stationery items"
+        ],
+        "tags": [
+          "napkin",
+          "wood napkin",
+          "elegant napkin",
+          "wood",
+          "elegant",
+          "luncheon napkins",
+          "count",
+          "paper",
+          "luncheon",
+          "napkins"
+        ],
+        "search_query": "wood napkin event &"
+      },
+      "reference": {
+        "title": "20-Count 3-Ply Paper Luncheon Napkins, Into the Woods",
+        "description": "Add an exquisite designer touch to your special brunch, dinner or cocktail party with ' decorative napkins. Our soft, triple-ply paper napkins come in 3 sizes - cocktail, guest/hostess and luncheon.\n\nCoordinate with our other paper items in a wide array of stunning designs to create an elegant, festive mood. Created by Bruce & Deborah Michel in the early 1980s, ' paper goods, trays, tinware, and melamine allow you to set a beautiful table without a lot of fuss.\n\nBest of all, they are as easy to care for as they are elegant. Making this kind of hospitality simple and fun is a big part of what we are all about.\n\nAnd look beyond the dining table to fully experience the brand. We welcome you lather up with our English soaps, enjoy the ambiance of our scented candles and end your day with a wonderfully fragrant bubble bath.",
+        "bullets": [
+          "20-Count package of sturdy 3-ply lunch napkins",
+          "Folded size: 6.5 x 6.5-inches",
+          "Nature speaks softly in the subtle colors, peaceful setting, and leafy green fragrance of this timeless design",
+          "Group together with coordinating plates and trays",
+          "Look to for luxurious, all-natural bath and body products and beautiful home and stationery items"
+        ],
+        "tags": [
+          "napkin",
+          "wood napkin",
+          "elegant napkin",
+          "wood",
+          "elegant",
+          "luncheon napkins",
+          "count",
+          "paper",
+          "luncheon",
+          "napkins",
+          "woods"
+        ],
+        "search_query": "wood napkin event &"
+      }
+    }
+  ],
+  "generated_at": "EXAMPLE",
+  "settings": {
+    "renderer": "qwen3_disable_thinking",
+    "temperature": 0.0,
+    "max_tokens": 1024,
+    "judge_model": "gemma-3-27b-it",
+    "test_file": "test.jsonl"
+  }
+}
