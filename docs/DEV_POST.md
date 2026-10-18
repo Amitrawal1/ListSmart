@@ -1,47 +1,46 @@
-<!--
-DEV post for the Hacktoberfest Open-Source AI Challenge, Week 2: Side Hustle.
-Title:  ListSmart: product photos in, Meesho/Etsy listing out, on your own laptop
-Tags:   #devchallenge #hf26challenge #opensource #ai
-Cover:  1000x420 screenshot of the app with a finished listing + price
-Before posting: replace every [FILL: ...] with real results (run `bash scripts/run_v2.sh`,
-then `python3 scripts/fill_submission.py` prints the numbers). Delete any section you can't fill honestly.
--->
-
 *This is a submission for the [Hacktoberfest Open-Source AI Challenge Week 2: Side Hustle](https://dev.to/challenges/hacktoberfest-week2-2026-10-12)*
 
 ## What I Built
 
 **ListSmart** turns a few product photos into a ready-to-post **Meesho or Etsy listing** (title, description, 5 bullet points and search tags) and suggests a **price** based on what competitors charge.
 
-**Who it's for:** small sellers in India who list on Meesho, Instagram shops or Etsy. Many of them write every listing by hand, in a second language, at night after packing orders. A seller with 50 products spends hours on titles and tags, and still guesses the price.
+**The problem:** small sellers in India who sell on Meesho, Instagram shops or Etsy write every listing by hand, often in their second language, late at night after packing orders. A seller with 50 products spends hours on titles and tags, and still guesses the price.
 
-**What it does for them:**
+**What ListSmart does for them:**
 - 📸 **Reads the photos.** An open vision model (Gemma) finds the product type, colour, material, pattern and key details.
-- ✍️ **Writes the listing.** Our **fine-tuned Qwen3-8B** writes it within each platform's rules (Meesho titles ≤ 100 characters, Etsy ≤ 140, tags ≤ 20 characters, exactly 5 bullets).
-- 💰 **Prices it.** It pulls competitor prices from Google Shopping (SerpApi), drops outliers, and suggests a price just under the market median that never goes below the seller's cost + 25%.
-- 🔒 **Keeps it private.** In private mode everything runs on the seller's laptop, so photos never leave the device and each listing costs **₹0**.
+- ✍️ **Writes the listing.** A **fine-tuned Qwen3-8B** writes it within each platform's rules: Meesho titles ≤ 100 characters, Etsy ≤ 140, tags ≤ 20 characters, exactly 5 bullets.
+- 💰 **Suggests a price.** It pulls competitor prices from Google Shopping (SerpApi), drops outliers, and suggests a price just under the market median that never goes below the seller's cost + 25%. It explains why in plain words.
+- 🔒 **Private mode.** Everything runs on the seller's own laptop, so photos never leave the device and each listing costs **₹0**.
+- ✏️ **Editable and ready to paste.** Every field is editable, with live character counters and one-click copy.
 
-**Who would pay:** sellers who list many products a week. The idea is the first 20 listings free, then about **₹199/month**, less than one hour of a freelancer's time. (That price is a guess I'm still testing with sellers; see *My First User*.)
+**Who would pay:** sellers who list many products every week. The plan is 20 free listings, then about **₹199/month**, less than an hour of a freelancer's time. I'm still testing that price with real sellers.
 
 ## Demo
 
-- 🌐 Live demo: [FILL: Render link]
-- 🎥 Video (2 min): [FILL: video link]
+The code and setup steps are on GitHub (below). To try it locally:
 
-To try it without any keys, open the app with `?demo=1` to use built-in sample data.
+```bash
+git clone https://github.com/Amitrawal1/ListSmart.git
+cd ListSmart/backend
+python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
+.venv/bin/uvicorn app.main:app --port 8001
+# open http://localhost:8001  (add ?demo=1 to try it with sample data, no keys needed)
+```
 
-[FILL: 2-3 screenshots: upload → listing → price chart → "Base vs Fine-tuned" panel]
+Every external service has an offline fallback, so the app runs with **zero API keys**. Run `python3 scripts/doctor.py` to see what's live and what to set up next.
 
 ## Code
 
 {% github Amitrawal1/ListSmart %}
 
 ```
-backend/    FastAPI app: Gemma vision -> fine-tuned writer -> SerpApi pricing; serves the frontend
-finetune/   data prep, Tinker LoRA training, evaluation (base vs fine-tuned), export to Ollama
+backend/    FastAPI: Gemma vision -> fine-tuned writer -> SerpApi pricing; also serves the frontend
+finetune/   data prep, Tinker LoRA training, evaluation (base vs fine-tuned), export to Ollama + Colab notebook
 frontend/   plain HTML/CSS/JS, no build step
 scripts/    doctor.py (setup checker), run_v2.sh (data -> train -> eval), fill_submission.py
 ```
+
+There are 120 automated tests (backend, fine-tune pipeline, setup checker), and every model call has an offline mock.
 
 ## How I Built It
 
@@ -49,70 +48,63 @@ scripts/    doctor.py (setup checker), run_v2.sh (data -> train -> eval), fill_s
 
 | Job | Open model | Where it runs |
 |---|---|---|
-| Read the photos | **Gemma 3 4B** (local, Ollama) / Gemma 4 (hosted fallback) | laptop, or Google AI Studio |
-| Write the listing | **Qwen3-8B + our LoRA fine-tune** | laptop (Ollama), or Tinker |
-| Clean the training data | **Qwen3.6-35B** as a teacher | Tinker |
-| Judge the eval | **Gemma 4 26B**, blind A/B | Google AI Studio |
+| Read the product photos | **Gemma 3 4B** (local), **Gemma 4** (hosted fallback) | laptop via **Ollama**, or Google AI Studio |
+| Write the listing | **Qwen3-8B + my LoRA fine-tune** | laptop via **Ollama**, or **Tinker** |
+| Clean the training data | **Qwen3.6-35B** as a "teacher" | **Tinker** |
+| Judge base vs fine-tuned | **Gemma 4 26B**, blind A/B | Google AI Studio |
 
-**Pipeline:** photos → Gemma pulls out product details as JSON → the fine-tuned writer turns them into listing JSON → SerpApi pulls competitor prices → a simple, explainable pricing rule.
+**Pipeline:** photos → Gemma pulls out product details as JSON → the fine-tuned writer turns them into listing JSON → SerpApi pulls competitor prices → a simple, explainable pricing rule. The app and the training code share a single prompt file, so the model sees the exact same format in training and in the app.
 
-**Fine-tuning on Tinker:** a LoRA (rank 32) on `Qwen/Qwen3-8B` with "thinking" turned off, trained on product details → listing pairs built from **2,000+ good real product listings** (Amazon Reviews 2023 metadata: clothing, home and handmade categories, rated 4+ stars). Loss is counted only on the listing the model writes, not on the prompt. A fixed set of **120 test products** is never used in training.
+**Fine-tuning on Tinker:** a LoRA (rank 32) on `Qwen/Qwen3-8B` with "thinking" turned off. It's trained on product details → listing pairs built from **2,100 good real product listings** (Amazon Reviews 2023 metadata: clothing, home and handmade categories, 4+ star ratings). Loss is counted only on the listing the model writes, not on the prompt. **120 test products** are held out and never used in training.
 
-**Honest part: my first fine-tune lost.** Version 1 trained for 3 epochs (~$2 on Tinker; val loss fell from 2.61 to 1.48). Then I measured it against the untrained base model on the 120 test products:
+### My first fine-tune lost, and that's where the real work was
+
+Version 1 trained for 3 epochs (~$2 on Tinker). Validation loss dropped from **2.61 to 1.48**, which looked great. Then I measured it against the untrained base model on the 120 test products:
 
 | Metric | Base Qwen3-8B | Fine-tune v1 |
 |---|---|---|
-| Valid JSON listing | 99.2% | 84.2% |
-| Follows platform rules | 85.8% | 74.2% |
-| Mentions the product's details | 89.7% | 59.5% |
-| Blind judge win rate | **77.5%** | 0.8% (21.7% tie) |
+| Valid JSON listing | **99.2%** | 84.2% |
+| Follows platform rules | **85.8%** | 74.2% |
+| Mentions the product's details | **89.7%** | 59.5% |
+| Wording overlap with the real listing (ROUGE-L) | 0.21 | **0.27** |
+| Blind Gemma judge preferred it | **77.5%** | 0.8% (tie 21.7%) |
 
-Lower loss, worse model. I read the outputs and found two problems:
-1. **Repetition loops.** 19 of 120 outputs looped, e.g. "10 Pack Door Stopper, 10 Pack Door Stopper, …". Real Amazon listings are keyword-stuffed: 38% of my training targets repeated 4-word phrases a lot.
-2. **Made-up facts.** The training targets had sizes and details that my simple rule-based extractor never put into the input, so the model learned to **invent** facts like "10.5 x 10.5 inches" and "Kanchipuram silk".
+**Lower loss, worse model.** Reading the outputs showed why:
+1. **Repetition loops.** 19 of 120 outputs got stuck, e.g. *"10 Pack Door Stopper, 10 Pack Door Stopper, …"*. Real Amazon listings are keyword-stuffed: **38%** of my training targets repeated 4-word phrases a lot, and the model learned it.
+2. **Made-up facts.** The real listings contained sizes and details that my simple rule-based extractor never put into the input. The model learned to **invent** facts, like *"10.5 x 10.5 inches"* for napkins and *"Kanchipuram silk"* for a plain maroon fabric photo.
 
-**The fix (v2):** a bigger open model (**Qwen3.6-35B** on Tinker) re-read every original listing, pulled out the true details, and rewrote each target using **only** those details: no repetition, exactly 5 bullets, platform limits enforced. Every row is checked automatically, and weak rows are dropped. A 60-row sample cost **$0.11**, and the full rebuild about $4. Then: 2 epochs (v1's val loss was lowest around epoch 1.7), and the eval runs at the app's real temperature (0.7) for both models.
+It copied the real listings' wording better (higher ROUGE-L) but became less honest and less reliable. That's exactly the wrong trade for a seller.
 
-**v2 results (same 120 test products, same prompts):**
+### The fix: v2 with grounded data (in progress)
 
-| Metric | Base Qwen3-8B | Fine-tune v2 |
-|---|---|---|
-| Valid JSON listing | [FILL] | [FILL] |
-| Follows platform rules | [FILL] | [FILL] |
-| Mentions the product's details | [FILL] | [FILL] |
-| ROUGE-L vs reference | [FILL] | [FILL] |
-| Blind judge win rate | [FILL] | [FILL] (tie [FILL]) |
+- A bigger open model, **Qwen3.6-35B on Tinker**, re-reads every original listing, pulls out the **true** product details, and rewrites each training target using **only** those details: no repetition, exactly 5 bullets, platform limits enforced.
+- Every row is checked automatically (valid format, no repeated phrases, ≥ 80% of the details mentioned, no numbers that aren't in the input, no brand names), and rows that fail are dropped.
+- The 120 test products stay exactly the same, so the comparison is fair.
+- Training drops to 2 epochs: v1's validation loss was lowest around epoch 1.7.
+- The eval samples both models at the app's real temperature (0.7) instead of 0.
 
-[FILL: one honest sentence on where v2 helped most and where base is still as good or better]
+A 60-row sample of the cleaned data cost **$0.11**, and the outputs were clean and specific: *"set of 12 · 2.16 in × 2.16 in × 2.60 in · for votive or tea light candles"* instead of *"MEASUREMENTS/MATERIAL: Each one measures 2"*. The full v2 run (about $6 in total) is next, and I'll update this post with the measured results, whether it wins or not.
 
-**Running locally:** recent Ollama versions dropped support for LoRA adapters, so the export script bakes the LoRA into one ~5 GB Q4_K_M GGUF with llama.cpp and loads it with `ollama create listsmart-writer`. My Mac has 8 GB of RAM and only 12 GB of free disk, so I built the GGUF on free Google Colab (a notebook is in the repo) and downloaded only the final file.
+### Running on a laptop
 
-**Built with Claude Code:** I worked with Claude Code as a team of parallel agents. Three agents wrote the backend, the fine-tune/eval pipeline and the frontend against one shared spec, and later agents did a bug review and built the data-cleaning step. I ran all the training and eval jobs myself.
+Recent Ollama versions no longer accept LoRA adapters, so the export script bakes the LoRA into one ~5 GB **Q4_K_M GGUF** with **llama.cpp** and loads it with `ollama create listsmart-writer`. My laptop is an 8 GB M1 with only 12 GB of free disk, so I build the GGUF on free Google Colab (the notebook is in the repo) and download only the final file.
+
+### Built with a team of AI agents
+
+I built this with **Claude Code** working as several agents in parallel. One wrote a shared spec, then three agents built the backend, the fine-tune/eval pipeline and the frontend at the same time against it. Later agents did a bug review (it found that the Render deploy would have silently skipped the fine-tuned model) and built the data-cleaning step. I ran every training and eval job myself and made the calls on cost and direction.
 
 ## Why Does Open Innovation Matter?
 
-- **I could fix the model, not just the prompt.** When v1 lost, I could read every training example, find the keyword stuffing and the missing facts, rebuild the data and retrain. With a closed API I could only have tweaked the prompt and hoped.
-- **The seller's photos stay on their laptop.** In private mode Gemma and the fine-tuned Qwen run in Ollama on the seller's own machine. Unreleased product photos and cost prices never go to someone else's server.
-- **It costs nothing per listing, so the business can work.** Local listings cost **₹0**. The same writer hosted on Tinker cost about **₹0.03** per listing in my live test. A ₹199/month plan stays profitable even for a seller who lists hundreds of products, with no API bill that grows with usage.
-- **It works offline.** Private mode skips the only online step (the price check), so a seller can write listings with patchy internet.
-- **No lock-in.** The base model, the LoRA and the GGUF are all files I own. If a provider changes its prices or retires a model (Tinker retired Qwen3-235B and Llama-3.3-70B during this build), I can swap models without rewriting the app.
-
-## My Agent Session
-
-[FILL: DevRelay embed using the agent_session tag, or a link to the saved session]
-
-## My First User
-
-[FILL: or delete this section if nobody has tried it yet. Be honest.]
-- **Who:** [FILL: e.g. a Meesho kurti seller in my family / a local shop owner]
-- **What they did:** [FILL: listed N products; posted M]
-- **What they said:** "[FILL: a quote, used with their permission]"
-- **Would they pay?** [FILL: yes / maybe / no, and how much per month]
-- **Did they pay?** [FILL: "Not yet" is fine]
-- **What they asked for next:** [FILL: e.g. Hindi descriptions, bulk upload]
+- **I could fix the model, not just the prompt.** When v1 lost, I could open every training example, find the keyword stuffing and the missing facts, rebuild the data and retrain. With a closed API, all I could have done is tweak the prompt and hope.
+- **The seller's photos stay on their laptop.** In private mode, Gemma and the fine-tuned Qwen run in Ollama on the seller's own machine. Unreleased product photos and cost prices never reach someone else's server.
+- **₹0 per listing makes the business work.** Local listings cost nothing. The same writer hosted on Tinker cost about **₹0.03** per listing in my live test. A ₹199/month plan stays profitable even for a seller who lists hundreds of products, because there's no API bill that grows with usage.
+- **It works offline.** Private mode skips the only online step, the competitor price check, so sellers with patchy internet can still write listings.
+- **No lock-in.** The base model, the LoRA and the GGUF are files I own. During this build Tinker retired several models (Qwen3-235B, Llama-3.3-70B) and Google's API stopped serving the Gemma 3 model I'd started with. Because the stack is open and the model names are just settings, switching took minutes, not a rewrite.
 
 ## Prize Categories
 
-[FILL: check the challenge page and list only the categories that apply, e.g. Gemma (vision + judge), Tinker (fine-tune + measured eval), SerpApi (competitor prices), Render (deploy, only once it's live)]
+- **Gemma**: reads the product photos (Gemma 3 locally, Gemma 4 hosted) and judges the blind A/B eval.
+- **Tinker**: LoRA fine-tune of Qwen3-8B, a teacher model for grounded data, and a measured base-vs-fine-tuned eval (v1 reported honestly above).
+- **SerpApi**: Google Shopping competitor prices behind the price suggestion.
 
 <!-- Thanks for participating! -->
