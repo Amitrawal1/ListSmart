@@ -1,0 +1,16 @@
+{
+  "finetuned_model": "tinker://a44e4907-15df-5225-9bbc-42a02b6f7c03:train:0/sampler_weights/listsmart-writer",
+  "external_weights": "tinker://a44e4907-15df-5225-9bbc-42a02b6f7c03:train:0/external_weights/listsmart-writer",
+  "base_model": "Qwen/Qwen3-8B",
+  "renderer": "qwen3_disable_thinking",
+  "lora_rank": 32,
+  "learning_rate": 0.00047297908091376354,
+  "epochs": 3,
+  "batch_size": 32,
+  "steps": 174,
+  "n_train": 1880,
+  "val_loss_before": 2.6076634311676026,
+  "val_loss_after": 1.475814700126648,
+  "last_train_loss": 1.1510260105133057,
+  "finished_at": "2026-10-18T07:22:53.993188+00:00"
+}

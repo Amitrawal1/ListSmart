@@ -73,7 +73,7 @@ def get_settings() -> Settings:
     if vision not in VISION_BACKENDS:
         vision = "mock"
     return Settings(
-        gemma_model=_env("GEMMA_MODEL", "gemma-3-27b-it"),
+        gemma_model=_env("GEMMA_MODEL", "gemma-4-26b-a4b-it"),
         # Either name works; GOOGLE_API_KEY is checked first
         google_api_key=_env("GOOGLE_API_KEY") or _env("GEMINI_API_KEY"),
         serpapi_key=_env("SERPAPI_KEY"),

@@ -106,7 +106,8 @@ def gemma_listing(attributes: dict, platform: str, notes: str, settings: Setting
     response = client.models.generate_content(
         model=settings.gemma_model,
         contents=[types.Content(role="user", parts=[types.Part.from_text(text=f"{system}\n\n{user}")])],
-        config=types.GenerateContentConfig(temperature=0.7, max_output_tokens=MAX_TOKENS),
+        # Gemma 4 thinks first, so add room on top of the listing itself
+        config=types.GenerateContentConfig(temperature=0.7, max_output_tokens=MAX_TOKENS + 1024),
     )
     return parse_listing(response.text or "", platform)
 

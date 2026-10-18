@@ -22,7 +22,7 @@ ListSmart/
 
 ## Pipeline
 1. `vision.py`  — Gemma (Google AI Studio via `google-genai`, model from env `GEMMA_MODEL`,
-   default `gemma-3-27b-it`) looks at 1-5 photos and returns **product attributes JSON**
+   default `gemma-4-26b-a4b-it`) looks at 1-5 photos and returns **product attributes JSON**
    (see ProductAttributes). 
 2. `writer.py`  — turns attributes + platform + seller notes into a **Listing JSON**.
    Backends chosen by env `WRITER_BACKEND`:

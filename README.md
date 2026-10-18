@@ -149,7 +149,7 @@ Fill in `.env` (see `.env.example` for comments):
 | `OLLAMA_WRITER_MODEL` | default `listsmart-writer`; `qwen3:8b` for the base model | `finetune/` |
 | `OFFLINE_MODE` | `true` = never call SerpApi | – |
 | `GOOGLE_API_KEY` | Hosted Gemma vision + base writer + LLM judge | https://aistudio.google.com/apikey |
-| `GEMMA_MODEL` | Hosted Gemma model name (default `gemma-3-27b-it`) | – |
+| `GEMMA_MODEL` | Hosted Gemma model name (default `gemma-4-26b-a4b-it`) | – |
 | `SERPAPI_KEY` | Google Shopping competitor prices | https://serpapi.com/manage-api-key |
 | `TINKER_API_KEY` | Sample the fine-tuned writer on Tinker | Tinker console |
 | `TINKER_MODEL_PATH` | `tinker://...` checkpoint printed by the training script | `finetune/` |

@@ -73,7 +73,7 @@ Keys are read from the environment or from `finetune/.env` / `ListSmart/.env`:
 ```
 TINKER_API_KEY=...        # needed for train.py and evaluate.py
 GOOGLE_API_KEY=...        # needed for the Gemma judge in evaluate.py (skip with --no-judge)
-GEMMA_MODEL=gemma-3-27b-it   # optional, judge model
+GEMMA_MODEL=gemma-4-26b-a4b-it   # optional, judge model
 HF_TOKEN=...              # optional, only if HuggingFace rate-limits the download
 ```
 
@@ -176,7 +176,7 @@ its numbers as results.
    style) that appear in title + description. The references themselves score about 0.70, so that
    is roughly the ceiling for "copying the real-listing style".
 4. **rouge_l**: ROUGE-L F1 (rouge-score, stemmed) of title+description+bullets vs the reference.
-5. **judge**: Gemma (`gemma-3-27b-it`) sees the attributes and both listings as "A" and "B" in a
+5. **judge**: Gemma (`gemma-4-26b-a4b-it`) sees the attributes and both listings as "A" and "B" in a
    random, seeded order and picks the better one (or TIE). If only one output is valid JSON it
    wins without a judge call; if both are invalid it is a tie (`auto_decided` counts these).
    Invalid outputs score 0 on the other metrics.

@@ -127,7 +127,8 @@ def gemma_api_attributes(images: list[tuple[bytes, str]], settings: Settings) ->
     response = client.models.generate_content(
         model=settings.gemma_model,
         contents=[types.Content(role="user", parts=parts)],
-        config=types.GenerateContentConfig(temperature=0.2, max_output_tokens=800),
+        # Extra room because Gemma 4 thinks before answering
+        config=types.GenerateContentConfig(temperature=0.2, max_output_tokens=2048),
     )
     return normalize_attributes(extract_json_object(response.text or ""))
 

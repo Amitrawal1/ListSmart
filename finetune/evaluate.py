@@ -63,7 +63,7 @@ def parse_args():
     p.add_argument("--temperature", type=float, default=0.0)
     p.add_argument("--max-tokens", type=int, default=1024)
     p.add_argument("--concurrency", type=int, default=32, help="sampling requests in flight at once")
-    p.add_argument("--judge-model", default=os.environ.get("GEMMA_MODEL", "gemma-3-27b-it"))
+    p.add_argument("--judge-model", default=os.environ.get("GEMMA_MODEL", "gemma-4-26b-a4b-it"))
     p.add_argument("--judge-sleep", type=float, default=2.1, help="seconds between judge calls (free-tier rate limit)")
     p.add_argument("--no-judge", action="store_true", help="skip the Gemma LLM judge")
     p.add_argument("--n-examples", type=int, default=3, help="examples copied into the summary for the frontend")
@@ -279,7 +279,8 @@ def make_judge(model_name):
     from google.genai import types
 
     client = genai.Client(api_key=require_env("GOOGLE_API_KEY"))
-    config = types.GenerateContentConfig(temperature=0.0, max_output_tokens=200)
+    # Gemma 4 "thinks" first (~200 tokens), so leave room for the answer too
+    config = types.GenerateContentConfig(temperature=0.0, max_output_tokens=1024)
 
     def call(prompt):
         # Retry a few times because free-tier keys hit rate limits now and then
@@ -288,6 +289,10 @@ def make_judge(model_name):
                 resp = client.models.generate_content(model=model_name, contents=prompt, config=config)
                 return resp.text or ""
             except Exception as err:  # noqa: BLE001 - any API error: wait and retry
+                # A wrong model name will never work, so stop right away instead of retrying
+                if "404" in str(err) or "NOT_FOUND" in str(err):
+                    sys.exit(f"ERROR: judge model '{model_name}' not found for this key. "
+                             "Pick one from the Gemma models your key can use, e.g. --judge-model gemma-4-26b-a4b-it")
                 wait = 5 * (attempt + 1)
                 print(f"  judge error ({err.__class__.__name__}: {str(err)[:120]}), retrying in {wait}s")
                 time.sleep(wait)
@@ -556,9 +561,22 @@ def main():
             }
             closed["scores"] = [metrics.score_example(c["text"], r) for c, r in zip(calls, rows)]
 
+    # Keep only latency/token info from a call (the text is stored separately)
+    def call_info(c):
+        return {k: v for k, v in c.items() if k != "text"}
+
     # ---- automatic metrics
     base_scores = [metrics.score_example(t, r) for t, r in zip(base_texts, rows)]
     ft_scores = [metrics.score_example(t, r) for t, r in zip(ft_texts, rows)]
+
+    # ---- save raw samples first, so a judge failure never loses the (paid) sampling
+    if not args.reuse_outputs:
+        write_jsonl(outputs_file, [
+            {"id": r["id"], "base": {"raw": base_texts[i], "call": call_info(base_calls[i])},
+             "finetuned": {"raw": ft_texts[i], "call": call_info(ft_calls[i])}}
+            for i, r in enumerate(rows)
+        ])
+        print(f"saved raw samples to {outputs_file} (use --reuse-outputs to re-judge without sampling)")
 
     # ---- LLM judge
     judgements = [None] * len(rows)
@@ -573,9 +591,6 @@ def main():
                 print(f"[judge] {i + 1}/{len(rows)}", flush=True)
 
     # ---- per-example file ("call" holds latency + token counts for that one generation)
-    def call_info(c):
-        return {k: v for k, v in c.items() if k != "text"}
-
     per_example = []
     for i, (row, bs, fs, jd) in enumerate(zip(rows, base_scores, ft_scores, judgements)):
         entry = {
