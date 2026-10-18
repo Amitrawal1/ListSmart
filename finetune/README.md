@@ -7,6 +7,8 @@ model on the same held-out prompts (the Tinker sponsor requirement).
 ```
 finetune/
   prepare_data.py   download + filter good listings -> data/{train,val,test}.jsonl
+  build_grounded_data.py   v2: teacher model on Tinker cleans the data -> data/*_grounded.jsonl
+  grounding.py      pure helpers for it: teacher prompts, parsing, validation (tested in tests/)
   train.py          LoRA SFT on Tinker, loss only on the assistant answer
   evaluate.py       base vs fine-tuned on the test set -> results/eval_*.{json,jsonl,md}
                     (--backend tinker = hosted, --backend ollama = on this laptop)
@@ -59,6 +61,85 @@ For each listing we build:
 Split is by product (one row per `parent_asin`, near-duplicate titles removed), seeded:
 **train 1880 / val 100 / test 120**. Every reference passes 100% of the constraint checks.
 
+## v2: grounded data (why v1 lost, and what to run now)
+
+### Why v1 lost (honest numbers, archived in `results/v1/`)
+
+v1 = Qwen3-8B LoRA, 3 epochs on the raw Amazon references, eval at temperature 0 on the 120 test rows:
+
+| metric | base | v1 fine-tuned |
+|---|---|---|
+| Gemma judge win rate | **0.775** | **0.008** (ties 0.217) |
+| format_valid | 0.99 | 0.84 (19/120 outputs were repetition loops, e.g. "10 Pack Door Stopper, 10 Pack Door Stopper, ...") |
+| constraint_compliance | 0.86 | 0.74 |
+| attribute_coverage | 0.90 | 0.60 |
+| rouge_l (vs the Amazon reference) | 0.21 | 0.27 |
+
+The fine-tuned model got closer to the Amazon wording (ROUGE up) but became a much worse listing writer.
+The cause was the training data, not the training run (val loss went 2.61 -> 1.48):
+1. **Targets had facts the input did not.** Attributes come from a lossy rule-based extractor (it labelled
+   paper napkins' material "wood"; brand stripping left fragments like "Look to for luxurious"), but the
+   targets are full Amazon listings. So the model learned to **invent** facts ("10.5 x 10.5 inches", "100100").
+2. **Keyword stuffing.** 38% of the references have heavy 4-gram repetition, so the model learned to **loop**.
+3. **References mention only ~70% of the attributes**, so the model learned to **skip** attributes.
+
+### The fix: `build_grounded_data.py`
+
+A big **teacher** model on Tinker rebuilds every row (default `Qwen/Qwen3.5-397B-A17B`, thinking off via the
+cookbook renderer `qwen3_5_disable_thinking`; Qwen3-235B and Llama-3.3-70B were retired from Tinker in June 2026):
+1. **EXTRACT**: reads the *original* listing (`source.original`) and writes ProductAttributes JSON in the SPEC
+   schema, with up to 8 short, true `key_features` (counts, sizes, uses), no brand names. This mirrors what
+   Gemma vision gives the app.
+2. **REWRITE** (all splits): writes the target listing from the exact writer prompt the small model sees,
+   keeping the real listing's tone but stating **only** facts in the attributes/notes, no repetition,
+   exactly 5 bullets, platform title limit, tags <= 20 chars, 2-4 paragraphs.
+3. **VALIDATE** (`grounding.listing_problems`): `prompts.parse_listing` + every metrics constraint check +
+   repeated 4-gram share <= 0.05 in each field + attribute coverage >= 0.8 + no numbers that are not in the
+   attributes/notes + no brand names. A failing answer gets **one retry** with the problems listed; if it
+   still fails, a train/val row is **dropped** (logged in `data/grounded_dropped.jsonl`). **Test rows are never
+   dropped**: they fall back to the old attributes/reference and are flagged in `row["grounding"]["fallback"]`.
+
+Output: `data/{train,val,test}_grounded.jsonl`, same row shape, plus `attributes_original`,
+`reference_original` and a `grounding` block. The test file has **the same 120 product ids** in the same
+order; its rewritten reference is only used for ROUGE, and its attributes are the teacher-extracted ones
+(closer to what the app gets from Gemma). `train.py` and `evaluate.py` pick the grounded files automatically
+once they are **finished** (`--data-variant raw` goes back to v1 data); they print which files they use.
+
+Teacher price on Tinker (per 1M tokens, Oct 2026): Qwen3.5-397B-A17B $1.65 prefill / $7.50 sample.
+Cheaper option: `--teacher-model Qwen/Qwen3.6-35B-A3B` ($0.45 / $1.335, about 5x cheaper, weaker).
+The script prints a cost estimate and asks before it spends anything (`--yes` skips the question).
+
+### Commands, in order (v2)
+
+```bash
+# 0. Add the original listing text to the existing data files (~15 s, free HuggingFace download).
+#    Same rows, same ids, nothing else changes - the test set stays identical.
+python prepare_data.py --fill-source
+
+# 1. Offline check with a mock teacher (writes data/dry_run/, no Tinker calls)
+python build_grounded_data.py --dry-run
+
+# 2. Small real run: first 20 rows of each split (~60 rows, about $1, a few minutes).
+#    It prints 2 finished examples at the end - read them: no invented sizes, no loops, no brands?
+#    (train.py / evaluate.py ignore the grounded files until they are complete.)
+python build_grounded_data.py --limit 20
+
+# 3. Full run (resumes: the 60 rows from step 2 are skipped). Asks before spending.
+#    Estimate: ~5-7M prefill + ~2.5M sampled tokens -> roughly $25-40 with the 397B teacher
+#    (~$6-9 with Qwen3.6-35B-A3B), about 1-3 hours. If it stops, run it again.
+python build_grounded_data.py
+
+# 4. Train on the grounded data (2 epochs now, ~110 steps, ~2M tokens -> about $1, 15-40 min)
+python train.py
+
+# 5. Evaluate base vs fine-tuned on the grounded test set (temperature 0.7 now, like the app;
+#    240 generations ~$0.5 + ~5 min Gemma judge)
+python evaluate.py
+```
+
+The estimates are rough: the script uses ~3.5 characters per token and assumes 30% of answers need a retry.
+Check the Tinker console after step 2 for the real cost per row and scale it by ~35 (2100 / 60).
+
 ## Setup
 
 ```bash
@@ -89,7 +170,9 @@ python evaluate.py --backend ollama --dry-run --limit 5   # shows the exact Olla
 python export_to_ollama.py --dry-run                      # shows every export step, command, disk + RAM need
 
 # 1. Build the dataset (~15 s). Already done once; re-run to rebuild data/*.jsonl
+#    (it refuses to overwrite data/test.jsonl if the test ids would change; see --fill-source / --force)
 python prepare_data.py
+#    v2: then build the grounded data, see "v2" above (prepare_data.py --fill-source, build_grounded_data.py)
 
 # 2. Fine-tune on Tinker (needs TINKER_API_KEY). Also saves downloadable "external" weights for step 4.
 python train.py
@@ -139,7 +222,8 @@ The app must sample with the same chat format as training: Tinker uses the rende
 | `--base-model` | `Qwen/Qwen3-8B` | |
 | `--lora-rank` | 32 | |
 | `--lr` | cookbook's `get_lr()` = 4.7e-4 for Qwen3-8B LoRA | |
-| `--epochs` | 3 | 58 steps per epoch -> 174 steps |
+| `--epochs` | 2 | 58 steps per epoch on raw data (fewer on grounded data, some rows are dropped); v1 used 3 and overfitted after ~1.7 |
+| `--data-variant` | grounded if `data/{train,val}_grounded.jsonl` are finished, else raw | printed at start, saved in `train_info.json` |
 | `--batch-size` | 32 | |
 | `--max-length` | 2048 | longest example is ~800 tokens, so nothing is cut |
 | `--eval-every` | 20 | val loss on 100 held-out rows |
@@ -278,8 +362,8 @@ other apps; the first call also loads ~5 GB). `--limit 20` x 2 models is about 2
 
 ## Time and cost (rough estimates, check the Tinker console)
 
-- Training: ~3.4M tokens (1880 examples x ~600 tokens x 3 epochs) plus ~0.6M tokens of val
-  forward passes -> about **$2** on Qwen3-8B. Usually 15-40 minutes depending on queue.
+- Training: ~2.3M tokens (1880 examples x ~600 tokens x 2 epochs) plus ~0.4M tokens of val
+  forward passes -> about **$1-2** on Qwen3-8B. Usually 15-40 minutes depending on queue.
 - Eval sampling: 240 generations (120 x 2 models), ~0.3M tokens -> well under **$1**, a few minutes.
 - Judge: 120 Gemma calls at ~2 s each (rate limit sleep) -> about **5 minutes**, free tier.
 
@@ -293,6 +377,7 @@ other apps; the first call also loads ~5 GB). `--limit 20` x 2 models is about 2
   so format_valid failures mean truly broken JSON or missing fields.
 - Judge 429 / quota errors: raise `--judge-sleep`, or run `--no-judge` first and later
   `--reuse-outputs` to judge without re-sampling.
-- Temperature is 0 by default, so re-running gives (almost) the same outputs.
+- Temperature is 0.7 by default (the same as the app), so outputs vary a little between runs; pass
+  `--temperature 0` for (almost) repeatable outputs. The value is saved in `eval_summary.json` settings.
 - Reference listings come from Amazon, so some still mention sizes or details that are not in the
   attributes. That is a known limit of using real listings as targets.

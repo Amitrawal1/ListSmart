@@ -10,10 +10,15 @@ Each good listing becomes one row:
 Attributes are extracted from the listing text with simple rules (no vision needed),
 and the reference Listing is cleaned up to obey the platform limits in prompts.py.
 
+source.original keeps the cleaned ORIGINAL listing text (title, description, features,
+details, categories, brand) so build_grounded_data.py can show it to a teacher model.
+
 Usage:
   python prepare_data.py --dry-run            # quick look at a few rows, writes nothing
   python prepare_data.py --limit 300          # small dataset for testing
   python prepare_data.py                      # full dataset (~2100 rows)
+  python prepare_data.py --fill-source        # only ADD source.original to the existing data/*.jsonl
+                                              # (same rows, same ids, nothing else changes)
 """
 
 import argparse
@@ -27,7 +32,7 @@ import sys
 
 import requests
 
-from common import DATA_DIR, prompts, write_jsonl
+from common import DATA_DIR, prompts, read_jsonl, write_jsonl
 
 HF_URL = (
     "https://huggingface.co/datasets/McAuley-Lab/Amazon-Reviews-2023/resolve/main/"
@@ -393,7 +398,27 @@ def convert(meta: dict, rng: random.Random, min_rating: float, min_reviews: int)
             "parent_asin": meta.get("parent_asin"),
             "average_rating": meta.get("average_rating"),
             "rating_number": meta.get("rating_number"),
+            "original": original_listing(meta),
         },
+    }
+
+
+def original_listing(meta: dict) -> dict:
+    """The original listing text, lightly cleaned (HTML removed) but NOT brand-stripped.
+
+    The teacher model in build_grounded_data.py reads this to pull out true facts.
+    We keep the brand names too, so the teacher can be told exactly which names to leave out.
+    """
+    details = meta.get("details") or {}
+    return {
+        "title": clean_text(meta.get("title")),
+        "description": cut_at_word(clean_text(" ".join(meta.get("description") or [])), 3000),
+        "features": [clean_text(f)[:400] for f in (meta.get("features") or [])][:12],
+        # Only short detail fields ("Material", "Color", "Item Dimensions" ...), long ones are noise
+        "details": {str(k): clean_text(v)[:150] for k, v in details.items() if isinstance(v, (str, int, float))},
+        "categories": [c for c in (meta.get("categories") or []) if c],
+        "store": clean_text(meta.get("store") or ""),
+        "brand": clean_text(details.get("Brand", "")),
     }
 
 
@@ -455,6 +480,36 @@ def split_rows(rows: list[dict], seed: int, min_test: int = 120):
     return train, val, test
 
 
+def fill_source(rows: list[dict], out_dir: str) -> None:
+    """Add source.original to the rows already in out_dir, matched by product id.
+
+    Nothing else in the files changes, so the test set (and its ids) stays exactly the same.
+    `rows` must come from collect_rows() with the same settings that built the files.
+    """
+    by_id = {r["id"]: r for r in rows}
+    files = ["train.jsonl", "val.jsonl", "test.jsonl", "sample_train.jsonl", "sample_test.jsonl"]
+    for name in files:
+        path = f"{out_dir}/{name}"
+        if not os.path.exists(path):
+            continue
+        existing = read_jsonl(path)
+        found = changed_ref = 0
+        for row in existing:
+            new = by_id.get(row["id"])
+            if not new:
+                continue
+            found += 1
+            row.setdefault("source", {})["original"] = new["source"]["original"]
+            # Sanity check: the rebuilt row should be the same listing we already had
+            if new["reference"] != row["reference"]:
+                changed_ref += 1
+        write_jsonl(path, existing)
+        note = f", {changed_ref} rebuilt references differ (data upstream changed?)" if changed_ref else ""
+        print(f"{name}: added source.original to {found}/{len(existing)} rows{note}")
+        if found < len(existing):
+            print(f"  WARNING: {len(existing) - found} rows not found - run with the same --limit/--categories/--seed as before")
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--limit", type=int, default=2100, help="total number of good listings to collect")
@@ -467,6 +522,10 @@ def main():
     parser.add_argument("--out-dir", default=str(DATA_DIR))
     parser.add_argument("--sample-size", type=int, default=20, help="rows copied to data/sample_*.jsonl")
     parser.add_argument("--dry-run", action="store_true", help="fetch a handful of rows, print them, write nothing")
+    parser.add_argument("--fill-source", action="store_true",
+                        help="only add source.original (original listing text) to the existing data files")
+    parser.add_argument("--force", action="store_true",
+                        help="allow overwriting data/test.jsonl even if the new test ids differ from the old ones")
     args = parser.parse_args()
 
     if args.dry_run:
@@ -482,11 +541,23 @@ def main():
     if not rows:
         sys.exit("No rows collected - check your internet connection or the filters.")
 
+    if args.fill_source:
+        fill_source(rows, args.out_dir)
+        return
+
     train, val, test = split_rows(rows, args.seed, args.min_test)
     if len(test) < args.min_test:
         print(f"WARNING: test set has only {len(test)} rows (SPEC wants >= 100). Use a bigger --limit for the real run.")
 
     out = args.out_dir
+    # The test set must never change silently (results are compared across runs on it)
+    old_test = f"{out}/test.jsonl"
+    if os.path.exists(old_test) and not args.force:
+        old_ids = [r["id"] for r in read_jsonl(old_test)]
+        if old_ids != [r["id"] for r in test]:
+            sys.exit("ERROR: the rebuilt test set has different product ids than data/test.jsonl. "
+                     "Nothing was written. Use --fill-source to only add the original text, "
+                     "or --force to really replace the test set.")
     write_jsonl(f"{out}/train.jsonl", train)
     write_jsonl(f"{out}/val.jsonl", val)
     write_jsonl(f"{out}/test.jsonl", test)

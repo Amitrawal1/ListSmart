@@ -1,7 +1,7 @@
 """Evaluate the base model vs the fine-tuned model on the SAME held-out test prompts.
 
 Both models get identical prompts (prompts.build_writer_messages), the same chat format and
-low temperature. Two ways to sample them (--backend):
+the same temperature (0.7 by default, like the app). Two ways to sample them (--backend):
   tinker  (default) base Qwen/Qwen3-8B vs the tinker:// LoRA, hosted on Tinker
   ollama  base `qwen3:8b` vs our `listsmart-writer`, running LOCALLY in Ollama (raw prompts built by
           backend/app/chat_template.py, the same text the model saw in training) Metrics (see SPEC.md and metrics.py):
@@ -39,12 +39,13 @@ from datetime import datetime, timezone
 import metrics
 import speed
 from common import (
-    DATA_DIR,
     DEFAULT_BASE_MODEL,
     RESULTS_DIR,
     chat_template,
     choose_renderer_name,
+    data_file,
     load_env,
+    pick_data_variant,
     prompt_messages,
     prompts,
     read_jsonl,
@@ -55,12 +56,16 @@ from common import (
 
 def parse_args():
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    p.add_argument("--test-file", default=str(DATA_DIR / "test.jsonl"))
+    p.add_argument("--data-variant", choices=["grounded", "raw"], default=None,
+                   help="grounded = data/test_grounded.jsonl (teacher-extracted attributes, like Gemma vision), "
+                        "raw = data/test.jsonl (default: grounded if it exists, else raw). Same product ids either way.")
+    p.add_argument("--test-file", default=None, help="override the test file (default: from --data-variant)")
     p.add_argument("--base-model", default=None, help="default: from results/train_info.json, else Qwen/Qwen3-8B")
     p.add_argument("--finetuned-model", default=None, help="tinker://... path (default: results/finetuned_model.txt)")
     p.add_argument("--renderer", default=None, help="default: same renderer train.py used")
     p.add_argument("--limit", type=int, default=None, help="only use the first N test rows")
-    p.add_argument("--temperature", type=float, default=0.0)
+    # Same temperature the app uses (backend/app/writer.py), so the eval matches real use
+    p.add_argument("--temperature", type=float, default=0.7)
     p.add_argument("--max-tokens", type=int, default=1024)
     p.add_argument("--concurrency", type=int, default=32, help="sampling requests in flight at once")
     p.add_argument("--judge-model", default=os.environ.get("GEMMA_MODEL", "gemma-4-26b-a4b-it"))
@@ -348,6 +353,8 @@ def write_report(path, summary):
         f"- Base model: `{summary['base_model']}`",
         f"- Fine-tuned: `{summary['finetuned_model']}`",
         f"- Test examples: {summary['n_test']} (held out, never seen in training)",
+        f"- Data: {summary['settings'].get('data_variant', 'raw')} ({summary['settings'].get('test_file')}), "
+        f"temperature {summary['settings'].get('temperature')}",
         f"- Generated: {summary['generated_at']}",
         "",
         "| Metric | Base | Fine-tuned | Change |",
@@ -481,7 +488,14 @@ def main():
     out_dir.mkdir(parents=True, exist_ok=True)
     outputs_file = out_dir / "eval_outputs.jsonl"
 
-    rows = read_jsonl(args.test_file)[: args.limit]
+    # Which test file: grounded (same 120 products, cleaner attributes + reference) when it exists
+    if args.test_file:
+        variant, test_file = "custom", args.test_file
+        print(f"data variant: custom (--test-file {test_file})")
+    else:
+        variant = pick_data_variant(args.data_variant, ["test"])
+        test_file = str(data_file("test", variant))
+    rows = read_jsonl(test_file)[: args.limit]
     train_info_file = RESULTS_DIR / "train_info.json"
     train_info = json.loads(train_info_file.read_text()) if train_info_file.exists() else {}
     base_model = args.base_model or train_info.get("base_model") or DEFAULT_BASE_MODEL
@@ -641,7 +655,8 @@ def main():
             "temperature": args.temperature,
             "max_tokens": args.max_tokens,
             "judge_model": None if args.no_judge else args.judge_model,
-            "test_file": Path(args.test_file).name,
+            "test_file": Path(test_file).name,
+            "data_variant": variant,
         },
     }
     if args.backend == "ollama":

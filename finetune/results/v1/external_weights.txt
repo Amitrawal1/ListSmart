@@ -1,0 +1,1 @@
+tinker://a44e4907-15df-5225-9bbc-42a02b6f7c03:train:0/external_weights/listsmart-writer

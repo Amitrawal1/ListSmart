@@ -114,6 +114,18 @@ same prompts for both models. Source: `finetune/results/eval_summary.json`.
 Blind LLM judge (Gemma, A/B order randomised): fine-tuned wins **{{judge_finetuned_win}}**, base wins
 {{judge_base_win}}, tie {{judge_tie}}.
 
+### Our first fine-tune lost, and why that matters
+
+Version 1 was trained straight on real Amazon listings, and it **lost** to the untrained base model:
+the judge picked base **{{v1_judge_base_win}}** of the time and v1 only **{{v1_judge_finetuned_win}}**.
+Valid JSON dropped to {{v1_format_valid_finetuned}} because the model got stuck repeating keyword
+phrases ("10 Pack Door Stopper, 10 Pack Door Stopper, …"), and it invented sizes that were not in its input.
+The cause was the data: real listings contain facts our input never showed the model, and many are
+keyword-stuffed. For version 2 a bigger open model (Qwen3.6-35B on Tinker) re-read every listing,
+pulled out the true facts, and rewrote each target using **only** those facts. Same base model,
+same {{n_test}} test products, both models sampled at the app's temperature (0.7).
+Being able to inspect and fix the training data ourselves is exactly what a closed API would not let us do.
+
 What this means in plain words (rewrite after you see the numbers — keep it honest):
 - {{one_sentence_where_finetune_helped_most}}
 - {{one_sentence_where_closed_was_still_better_or_equal}} ← keep this line even if closed wins somewhere.

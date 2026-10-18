@@ -1,0 +1,5 @@
+{"id": "B07MY5NRRP", "split": "train", "stage": "rewrite", "problems": ["need 1-13 tags, each at most 20 characters"]}
+{"id": "B008CJ62Y4", "split": "train", "stage": "rewrite", "problems": ["title/description must mention these attribute values: ['rafallian silver']"]}
+{"id": "B07CR6RKRC", "split": "val", "stage": "rewrite", "problems": ["need 1-13 tags, each at most 20 characters"]}
+{"id": "B07BPQSF2D", "split": "val", "stage": "rewrite", "problems": ["need 1-13 tags, each at most 20 characters"]}
+{"id": "B0886GC3NR", "split": "val", "stage": "rewrite", "problems": ["need 1-13 tags, each at most 20 characters"]}

@@ -105,6 +105,32 @@ def attribute_coverage(attributes: dict, listing: dict | None) -> float | None:
     return sum(_mentioned(v, text) for v in values) / len(values)
 
 
+# ---------------------------------------------------------------- repetition (keyword stuffing / loops)
+def ngram_repeat_ratio(text: str, n: int = 4) -> float:
+    """Share of word n-grams that are repeats of an earlier n-gram (0 = no repetition).
+
+    "10 Pack Door Stopper, 10 Pack Door Stopper, ..." scores close to 1.
+    """
+    words = re.findall(r"[a-z0-9]+", str(text or "").lower())
+    grams = [tuple(words[i : i + n]) for i in range(len(words) - n + 1)]
+    if not grams:
+        return 0.0
+    return 1 - len(set(grams)) / len(grams)
+
+
+def max_field_repeat_ratio(listing: dict | None, n: int = 4) -> float:
+    """Worst repeat ratio over title, description and bullets, each checked on its own.
+
+    Fields are checked separately because a title phrase showing up again in the
+    description is normal; the same phrase looping inside one field is not.
+    """
+    if not listing:
+        return 0.0
+    bullets = " ".join(str(b) for b in listing.get("bullets") or [])
+    fields = [listing.get("title", ""), listing.get("description", ""), bullets]
+    return max(ngram_repeat_ratio(f, n) for f in fields)
+
+
 # ---------------------------------------------------------------- 4. ROUGE-L
 def listing_text(listing: dict | None) -> str:
     """Flatten a listing into one string for text overlap scores."""

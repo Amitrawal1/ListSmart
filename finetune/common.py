@@ -92,6 +92,47 @@ def choose_renderer_name(model_name: str) -> str:
     return names[0]
 
 
+def data_file(split: str, variant: str):
+    """Path of one dataset split: 'raw' = data/train.jsonl, 'grounded' = data/train_grounded.jsonl."""
+    suffix = "_grounded" if variant == "grounded" else ""
+    return DATA_DIR / f"{split}{suffix}.jsonl"
+
+
+def grounded_missing(split: str) -> int:
+    """How many rows of the raw split are neither in the grounded file nor in the dropped log."""
+    raw_ids = {r["id"] for r in read_jsonl(data_file(split, "raw"))}
+    done = {r["id"] for r in read_jsonl(data_file(split, "grounded"))}
+    dropped_file = DATA_DIR / "grounded_dropped.jsonl"
+    if dropped_file.exists():
+        done |= {r["id"] for r in read_jsonl(dropped_file) if r.get("split") == split}
+    return len(raw_ids - done)
+
+
+def pick_data_variant(requested: str | None, splits: list[str]) -> str:
+    """Use the asked-for data variant, else 'grounded' when its files exist, else 'raw'.
+
+    Prints which one is used, so it is always clear what a run trained or evaluated on.
+    """
+    if requested:
+        variant = requested
+        reason = "--data-variant"
+    elif not all(data_file(s, "grounded").exists() for s in splits):
+        variant, reason = "raw", "no grounded files yet"
+    else:
+        missing = {s: grounded_missing(s) for s in splits}
+        if any(missing.values()):
+            # e.g. after `build_grounded_data.py --limit 20`: do not silently train/eval on 20 rows
+            variant = "raw"
+            reason = "grounded files are not finished, rows still to do: " + ", ".join(
+                f"{s}={n}" for s, n in missing.items() if n
+            ) + " (finish build_grounded_data.py, or force with --data-variant grounded)"
+        else:
+            variant, reason = "grounded", "grounded files found (build_grounded_data.py)"
+    files = ", ".join(data_file(s, variant).name for s in splits)
+    print(f"data variant: {variant} ({reason}) -> {files}")
+    return variant
+
+
 def require_env(name: str) -> str:
     """Return an env var or exit with a clear message."""
     value = os.environ.get(name, "").strip()

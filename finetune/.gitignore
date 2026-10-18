@@ -5,6 +5,10 @@ __pycache__/
 # Full dataset is rebuilt by prepare_data.py; only the small samples are kept in git
 data/train.jsonl
 data/val.jsonl
+data/train_grounded.jsonl
+data/val_grounded.jsonl
+# Mock output from build_grounded_data.py --dry-run
+data/dry_run/
 # Mock outputs from evaluate.py --dry-run
 results/dry_run/
 # export_to_ollama.py output (LoRA download, llama.cpp checkout, multi-GB GGUF files)

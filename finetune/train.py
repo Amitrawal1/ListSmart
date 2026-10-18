@@ -9,7 +9,8 @@ recipes/sl_loop.py): forward_backward -> optim_step, then save_weights_for_sampl
 
 Usage:
   python train.py --dry-run          # offline: tokenise the data, show the loss mask, no Tinker calls
-  python train.py                    # real run (needs TINKER_API_KEY)
+  python train.py                    # real run (needs TINKER_API_KEY); uses data/*_grounded.jsonl when present
+  python train.py --data-variant raw # train on the raw prepare_data.py files instead
 """
 
 import argparse
@@ -18,13 +19,15 @@ import math
 import random
 import time
 from datetime import datetime, timezone
+from pathlib import Path
 
 from common import (
-    DATA_DIR,
     DEFAULT_BASE_MODEL,
     RESULTS_DIR,
     choose_renderer_name,
+    data_file,
     load_env,
+    pick_data_variant,
     read_jsonl,
     require_env,
     training_conversation,
@@ -35,11 +38,15 @@ def parse_args():
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--base-model", default=DEFAULT_BASE_MODEL)
     p.add_argument("--renderer", default=None, help="cookbook renderer name (default: picked from the model)")
-    p.add_argument("--train-file", default=str(DATA_DIR / "train.jsonl"))
-    p.add_argument("--val-file", default=str(DATA_DIR / "val.jsonl"))
+    p.add_argument("--data-variant", choices=["grounded", "raw"], default=None,
+                   help="grounded = teacher-cleaned data from build_grounded_data.py, raw = prepare_data.py output "
+                        "(default: grounded if its files exist, else raw)")
+    p.add_argument("--train-file", default=None, help="override the train file (default: from --data-variant)")
+    p.add_argument("--val-file", default=None, help="override the val file (default: from --data-variant)")
     p.add_argument("--lora-rank", type=int, default=32)
     p.add_argument("--lr", type=float, default=None, help="learning rate (default: cookbook's recommended LoRA LR)")
-    p.add_argument("--epochs", type=int, default=3)
+    # 2 epochs: in v1 val loss was lowest around step 100 (~1.7 epochs), then started rising
+    p.add_argument("--epochs", type=int, default=2)
     p.add_argument("--batch-size", type=int, default=32)
     p.add_argument("--max-length", type=int, default=2048, help="max tokens per example (longer ones are cut)")
     p.add_argument("--eval-every", type=int, default=20, help="compute val loss every N steps (0 = only at the end)")
@@ -134,8 +141,17 @@ def main():
     lr = args.lr or hyperparam_utils.get_lr(args.base_model)
     print(f"base model={args.base_model} renderer={renderer_name} lora_rank={args.lora_rank} lr={lr:.2e}")
 
-    train_rows = read_jsonl(args.train_file)
-    val_rows = read_jsonl(args.val_file)[: args.max_val]
+    # Which data to learn from: the grounded (teacher-cleaned) files when they exist
+    if args.train_file or args.val_file:
+        variant = "custom"
+        train_file = args.train_file or str(data_file("train", "raw"))
+        val_file = args.val_file or str(data_file("val", "raw"))
+        print(f"data variant: custom (--train-file {train_file}, --val-file {val_file})")
+    else:
+        variant = pick_data_variant(args.data_variant, ["train", "val"])
+        train_file, val_file = str(data_file("train", variant)), str(data_file("val", variant))
+    train_rows = read_jsonl(train_file)
+    val_rows = read_jsonl(val_file)[: args.max_val]
 
     if args.dry_run:
         dry_run(args, renderer, tokenizer, train_rows, val_rows)
@@ -225,6 +241,8 @@ def main():
         "batch_size": args.batch_size,
         "steps": step,
         "n_train": len(train_rows),
+        "data_variant": variant,
+        "train_file": Path(train_file).name,
         "val_loss_before": first_val,
         "val_loss_after": last_val,
         "last_train_loss": train_loss,

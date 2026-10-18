@@ -170,6 +170,20 @@ Demo mode uses a built-in sample response (including the privacy strip, feedback
 eval numbers, clearly marked as samples), so you can try the whole UI without Python.
 You can also add `?demo=1` to the deployed URL.
 
+## Finish line (what is left, in order)
+
+1. **Fine-tune v2** (about $6 on Tinker, ~1 hour): `bash scripts/run_v2.sh`
+   (grounded data -> train -> eval -> fills `docs/SUBMISSION.filled.md`). v1 lost to the base model;
+   see `finetune/README.md` "v2" for why. Check the printed verdict before you claim a win.
+2. **Point the app at v2:** copy `finetune/results/finetuned_model.txt` into `TINKER_MODEL_PATH` in `.env`.
+3. **Commit the results** (`finetune/results/eval_summary.json`, `eval_report.md`, `train_info.json`)
+   so the deployed app shows the "Base vs Fine-tuned" panel.
+4. **Deploy on Render** (see below) and paste the same `TINKER_MODEL_PATH`, `GOOGLE_API_KEY`,
+   `TINKER_API_KEY` (and optional `SERPAPI_KEY`) into the Render dashboard.
+5. **Local mode:** build `listsmart-writer` with `finetune/colab_export.ipynb`, then
+   `ollama create listsmart-writer -f finetune/export/Modelfile`; check with `python3 scripts/doctor.py`.
+6. **First user:** follow `docs/FIRST_USER.md`, then fill the remaining `{{...}}` in `docs/SUBMISSION.filled.md`.
+
 ## Fine-tuning with Tinker
 
 All dataset, training and evaluation steps (with exact commands) are in

@@ -1,0 +1,391 @@
+{
+  "available": true,
+  "base_model": "Qwen/Qwen3-8B",
+  "finetuned_model": "tinker://a44e4907-15df-5225-9bbc-42a02b6f7c03:train:0/sampler_weights/listsmart-writer",
+  "n_test": 120,
+  "metrics": {
+    "format_valid": {
+      "base": 0.9917,
+      "finetuned": 0.8417
+    },
+    "constraint_compliance": {
+      "base": 0.8583,
+      "finetuned": 0.7417
+    },
+    "title_length_ok": {
+      "base": 0.9917,
+      "finetuned": 0.825
+    },
+    "bullets_exactly_5": {
+      "base": 0.9917,
+      "finetuned": 0.8417
+    },
+    "tags_ok": {
+      "base": 0.8833,
+      "finetuned": 0.775
+    },
+    "description_paragraphs_ok": {
+      "base": 0.9667,
+      "finetuned": 0.8333
+    },
+    "search_query_ok": {
+      "base": 0.9917,
+      "finetuned": 0.8333
+    },
+    "attribute_coverage": {
+      "base": 0.8968,
+      "finetuned": 0.5953
+    },
+    "rouge_l": {
+      "base": 0.2077,
+      "finetuned": 0.2683
+    }
+  },
+  "judge": {
+    "finetuned_win": 0.0083,
+    "base_win": 0.775,
+    "tie": 0.2167,
+    "n": 120,
+    "auto_decided": 20
+  },
+  "examples": [
+    {
+      "platform": "meesho",
+      "attributes": {
+        "product_type": "napkin",
+        "category": "Event & Party Supplies Tableware",
+        "colors": [],
+        "material": "wood",
+        "pattern": "",
+        "style": "elegant",
+        "gender": "",
+        "key_features": [
+          "20-Count package of sturdy 3-ply lunch napkins",
+          "Folded size",
+          "Nature speaks softly in the subtle colors",
+          "Group together with coordinating plates and trays",
+          "Look to for luxurious"
+        ],
+        "visible_text": "",
+        "condition": "new"
+      },
+      "base": {
+        "title": "Elegant 20-Count Wood Napkins",
+        "description": "These 20-count wood napkins are perfect for adding a touch of elegance to any event or gathering. Made from sturdy 3-ply material, they are both durable and eco-friendly, making them ideal for both indoor and outdoor use.\n\nThe subtle, natural colors of these napkins complement a variety of table settings, allowing them to blend seamlessly with plates, trays, and other party supplies. Their folded design makes them easy to store and transport, while their luxurious feel elevates the overall dining experience.\n\nWhether you're hosting a dinner party, a wedding, or a corporate event, these napkins are a great addition to your tableware collection. Their elegant style and natural aesthetic make them a versatile choice for any occasion.",
+        "bullets": [
+          "20-count package of sturdy 3-ply lunch napkins",
+          "Folded size for easy storage and transport",
+          "Subtle natural colors for elegant table settings",
+          "Perfect for coordinating with plates and trays",
+          "Luxurious feel for a refined dining experience"
+        ],
+        "tags": [
+          "elegant napkins",
+          "wood napkins",
+          "event tableware",
+          "party supplies",
+          "luxurious napkins",
+          "eco-friendly napkins",
+          "table setting",
+          "outdoor napkins",
+          "dinner party",
+          "wedding tableware",
+          "coordinating napkins",
+          "natural colors",
+          "3-ply napkins"
+        ],
+        "search_query": "elegant wood napkins"
+      },
+      "finetuned": {
+        "title": "20-Count 10.5 x 10.5-Inch 3-Ply Lunch Napkins, Nature Collection, 100100",
+        "description": "The Nature Collection by features a subtle pattern of leaves and branches in a muted color palette. The napkins are made of 3-ply premium paper and measure 10.5 x 10.5 inches when folded.\n\nThey are perfect for everyday use and can be used with any type of food. The napkins are also great for special occasions and can be used to coordinate with other tableware and decorations.\n\nThe napkins are also great for special occasions and can be used to coordinate with other tableware and decorations.",
+        "bullets": [
+          "20-Count package of sturdy 3-ply lunch napkins",
+          "Folded size: 10.5 x 10.5 inches",
+          "Nature speaks softly in the subtle colors and patterns of the Nature Collection by",
+          "Group together with coordinating plates and trays for a table setting that is sure to impress",
+          "Look to for luxurious, long-lasting tableware and accessories"
+        ],
+        "tags": [
+          "napkin",
+          "wood napkin",
+          "elegant napkin",
+          "wood",
+          "elegant",
+          "lunch napkins",
+          "count",
+          "lunch",
+          "napkins",
+          "nature",
+          "collection"
+        ],
+        "search_query": "wood napkin event &"
+      },
+      "reference": {
+        "title": "20-Count 3-Ply Paper Luncheon Napkins, Into the Woods",
+        "description": "Add an exquisite designer touch to your special brunch, dinner or cocktail party with ' decorative napkins. Our soft, triple-ply paper napkins come in 3 sizes - cocktail, guest/hostess and luncheon.\n\nCoordinate with our other paper items in a wide array of stunning designs to create an elegant, festive mood. Created by Bruce & Deborah Michel in the early 1980s, ' paper goods, trays, tinware, and melamine allow you to set a beautiful table without a lot of fuss.\n\nBest of all, they are as easy to care for as they are elegant. Making this kind of hospitality simple and fun is a big part of what we are all about.\n\nAnd look beyond the dining table to fully experience the brand. We welcome you lather up with our English soaps, enjoy the ambiance of our scented candles and end your day with a wonderfully fragrant bubble bath.",
+        "bullets": [
+          "20-Count package of sturdy 3-ply lunch napkins",
+          "Folded size: 6.5 x 6.5-inches",
+          "Nature speaks softly in the subtle colors, peaceful setting, and leafy green fragrance of this timeless design",
+          "Group together with coordinating plates and trays",
+          "Look to for luxurious, all-natural bath and body products and beautiful home and stationery items"
+        ],
+        "tags": [
+          "napkin",
+          "wood napkin",
+          "elegant napkin",
+          "wood",
+          "elegant",
+          "luncheon napkins",
+          "count",
+          "paper",
+          "luncheon",
+          "napkins",
+          "woods"
+        ],
+        "search_query": "wood napkin event &"
+      }
+    },
+    {
+      "platform": "meesho",
+      "attributes": {
+        "product_type": "tie",
+        "category": "Men Accessories",
+        "colors": [],
+        "material": "cotton",
+        "pattern": "solid",
+        "style": "casual",
+        "gender": "men",
+        "key_features": [
+          "Material: 100% Woven Microfiber",
+          "Width:2.5inches(6cm) / Length",
+          "Fitness for Men or Boys",
+          "Men's solid-color square knitted neck tie completes any",
+          "Made from a high-quality cotton polyester blend that feels"
+        ],
+        "visible_text": "",
+        "condition": "new"
+      },
+      "base": {
+        "title": "Men Solid Color Tie - Casual",
+        "description": "A stylish and versatile neck tie designed for men and boys. Perfect for casual occasions, this tie adds a touch of sophistication to any outfit.\n\nCrafted from high-quality cotton polyester blend, it offers comfort and durability. The solid color design makes it easy to match with different shirts and suits.\n\nThe 2.5-inch width ensures a balanced look, while the woven microfiber material provides a smooth and soft feel against the skin.",
+        "bullets": [
+          "100% woven microfiber material for softness",
+          "Solid color design for versatile styling",
+          "Perfect for casual and semi-formal wear",
+          "High-quality cotton polyester blend for comfort",
+          "2.5-inch width for balanced appearance"
+        ],
+        "tags": [
+          "men tie",
+          "solid color",
+          "casual tie",
+          "men accessories",
+          "neck tie",
+          "cotton tie",
+          "polyester tie",
+          "men fashion",
+          "stylish tie",
+          "everyday tie",
+          "men's tie",
+          "square tie",
+          "trendy tie"
+        ],
+        "search_query": "men solid color tie"
+      },
+      "finetuned": {
+        "title": "Men's Square Knitted Necktie, 2.5inches(6cm) / 58inches(147cm), Solid Color, 100% Cotton Polyester",
+        "description": "Material: 100% Woven Microfiber. Width:2.5inches(6cm) / Length:58inches(147cm).\n\nFitness for Men or Boys. Men's solid-color square knitted neck tie completes any casual or formal outfit.\n\nMade from a high-quality cotton polyester blend that feels and looks great. The square necktie is a great alternative to the traditional necktie.\n\nIt is easy to wear and can be worn with a collared shirt or a polo shirt. It is also a great gift for men.",
+        "bullets": [
+          "Material: 100% Woven Microfiber",
+          "Width:2.5inches(6cm) / Length:58inches(147cm)",
+          "Fitness for Men or Boys",
+          "Men's solid-color square knitted neck tie completes any casual or formal outfit.",
+          "Made from a high-quality cotton polyester blend that feels and looks great."
+        ],
+        "tags": [
+          "tie",
+          "cotton tie",
+          "solid tie",
+          "casual tie",
+          "tie for men",
+          "cotton",
+          "solid",
+          "casual",
+          "knitted necktie",
+          "square",
+          "knitted",
+          "necktie",
+          "color"
+        ],
+        "search_query": "cotton tie for men"
+      },
+      "reference": {
+        "title": "Vintage Casual Mens Solid 2\" Skinny Knit Tie For Groom",
+        "description": "Look your finest at any occasion with this high quality knitted necktie available in multiple different styles. From work to weddings, there is no occasion which this necktie can't accommodate.\n\nThe polyester gives the tie a nice smooth, soft feel and it is finished to help make it stain resistant. Go out looking your finest any day of the week.",
+        "bullets": [
+          "Material: 100% Woven Microfiber",
+          "Width:2.5inches(6cm) / Length:59inches(148cm) / Weight:0.11ponds(50g)",
+          "Fitness for Men or Boys. Flat Bottom",
+          "Men's solid-color square knitted neck tie completes any ensemble",
+          "Made from a high-quality cotton polyester blend that feels as soft as silk"
+        ],
+        "tags": [
+          "tie",
+          "cotton tie",
+          "solid tie",
+          "casual tie",
+          "tie for men",
+          "cotton",
+          "solid",
+          "casual",
+          "vintage",
+          "skinny",
+          "groom"
+        ],
+        "search_query": "cotton tie for men"
+      }
+    },
+    {
+      "platform": "etsy",
+      "attributes": {
+        "product_type": "statue",
+        "category": "Home Décor Products Home Décor Accents",
+        "colors": [
+          "copper",
+          "bronze"
+        ],
+        "material": "iron",
+        "pattern": "",
+        "style": "elegant",
+        "gender": "",
+        "key_features": [
+          "A wonderful craft art as France Souvenir",
+          "This is a nice little eiffel tower model",
+          "Eiffel Tower statues can be as gift for your families"
+        ],
+        "visible_text": "",
+        "condition": "new"
+      },
+      "base": {
+        "title": "Eiffel Tower Statue - Copper Bronze Elegant Decor",
+        "description": "This exquisite Eiffel Tower model is a perfect blend of art and craftsmanship. Handcrafted from iron, it brings a touch of French elegance to any space.\n\nIdeal as a unique gift for loved ones, this statue is a meaningful souvenir from France. Its intricate design captures the essence of the iconic landmark.\n\nWhether placed on a shelf, desk, or mantel, this statue adds a sophisticated and timeless charm to your home decor.",
+        "bullets": [
+          "Handcrafted iron Eiffel Tower model",
+          "Elegant design for home or office decor",
+          "Perfect gift for family and friends",
+          "Durable and long-lasting craftsmanship",
+          "Unique French souvenir with artistic appeal"
+        ],
+        "tags": [
+          "eiffel tower statue",
+          "home decor",
+          "french souvenir",
+          "elegant decor",
+          "iron statue",
+          "gift idea",
+          "artistic decor",
+          "table decor",
+          "room accent",
+          "unique gift",
+          "craft art",
+          "french landmark",
+          "home accent"
+        ],
+        "search_query": "eiffel tower statue decor"
+      },
+      "finetuned": {
+        "title": "Eiffel Tower Statue, 1:100 Scale, 10.5\"H, Handmade in France, Gift for Her, Gift for Him, Gift for Mom, Gift for Dad, Gift for Grandma",
+        "description": "This is a nice little eiffel tower model, 1:100 scale, 10.5\"H, handmade in France. It is made of iron, and it is a wonderful craft art as France Souvenir.\n\nThis is a nice little eiffel tower model, 1:100 scale, 10.5\"H, handmade in France. It is made of iron, and it is a wonderful craft art as France Souvenir.\n\nThis is a nice little eiffel tower model, 1:100 scale, 10.5\"H, handmade in France. It is made of iron, and it is a wonderful craft art as France Souvenir.",
+        "bullets": [
+          "A wonderful craft art as France Souvenir",
+          "This is a nice little eiffel tower model, 1:100 scale, 10.5\"H, handmade in France",
+          "Eiffel Tower statues can be as gift for your families, friends, colleagues, kids, and so on",
+          "This is a nice little eiffel tower model, 1:100 scale, 10.5\"H, handmade in France. It is made of iron, and it is a wonderful craft art as France Souvenir.",
+          "This is a nice little eiffel tower model, 1:100 scale, 10.5\"H, handmade in France. It is made of iron, and it is a wonderful craft art as France Souvenir."
+        ],
+        "tags": [
+          "statue",
+          "copper statue",
+          "bronze statue",
+          "iron statue",
+          "elegant statue",
+          "handmade statue",
+          "iron",
+          "elegant",
+          "eiffel",
+          "tower",
+          "statue",
+          "scale",
+          "handmade"
+        ],
+        "search_query": "copper iron statue"
+      },
+      "reference": {
+        "title": "5.9 inch Bronze Paris Eiffel Tower Modelling Iron Craft Art Gift for Home Decoration Statues",
+        "description": "Specifications: It features elegant design,stylish,high crafted finishing. Beautiful as decor or perfect for a cake decoration.\n\nIt is perfect for home and office decoration. Product details: Color:Bronze Material: Iron Size: 15cm /5.9inch Package Includes: 1 X Eiffel Tower Model",
+        "bullets": [
+          "A wonderful craft art as France Souvenir.",
+          "This is a nice little eiffel tower model. It would be ideal for anyone who likes Paris stuff.",
+          "Eiffel Tower statues can be as gift for your families, kids, lover, friends and give them a lot of memory and imagination about Paris.",
+          "Product details: Color:Bronze Material: Iron Size: 15cm /5.9inch Package Includes: 1 X Eiffel Tower Model",
+          "It is perfect for home and office decoration."
+        ],
+        "tags": [
+          "statue",
+          "copper statue",
+          "bronze statue",
+          "iron statue",
+          "elegant statue",
+          "iron",
+          "elegant",
+          "decoration statues",
+          "bronze",
+          "paris",
+          "eiffel",
+          "tower",
+          "modelling"
+        ],
+        "search_query": "copper iron statue"
+      }
+    }
+  ],
+  "speed": {
+    "base": {
+      "median_latency_s": 3.579,
+      "tokens_per_s": 75.14,
+      "mean_prompt_tokens": 285.1,
+      "mean_output_tokens": 283.1,
+      "n_calls": 120
+    },
+    "finetuned": {
+      "median_latency_s": 7.38,
+      "tokens_per_s": 45.56,
+      "mean_prompt_tokens": 285.1,
+      "mean_output_tokens": 408.3,
+      "n_calls": 120
+    },
+    "hardware": "Tinker (hosted GPUs; latency includes network + queue)"
+  },
+  "cost_per_1000_listings_inr": {
+    "local": 0,
+    "tinker_hosted": 34.95,
+    "closed_api": null,
+    "assumptions": {
+      "usd_to_inr": 84.0,
+      "tinker_usd_per_1m_tokens": 0.6,
+      "tokens_per_listing": 693.4000000000001,
+      "local_note": "runs on the seller's own laptop: no API fees (electricity not counted)"
+    }
+  },
+  "generated_at": "2026-10-18T08:06:05+00:00",
+  "settings": {
+    "backend": "tinker",
+    "renderer": "qwen3_disable_thinking",
+    "temperature": 0.0,
+    "max_tokens": 1024,
+    "judge_model": "gemma-4-26b-a4b-it",
+    "test_file": "test.jsonl"
+  }
+}
