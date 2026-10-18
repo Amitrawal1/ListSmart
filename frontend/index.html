@@ -5,10 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>ListSmart</title>
   <meta name="description" content="Turn product photos into a ready-to-post Meesho or Etsy listing with a smart price.">
-  <meta name="color-scheme" content="light">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <meta name="color-scheme" content="light dark">
   <!-- The backend serves these at /static/. If that fails (for example when you open
        this file straight from disk), we fall back to the file next to this page. -->
   <link rel="stylesheet" href="/static/styles.css" onerror="this.onerror=null;this.href='styles.css'">
@@ -18,17 +15,13 @@
 
   <header class="topbar">
     <div class="wrap topbar-inner">
-      <a class="brand" href="#top" aria-label="ListSmart home">
-        <span class="brand-mark" aria-hidden="true">
-          <svg viewBox="0 0 24 24"><path d="M4 7.5 12 3l8 4.5v9L12 21l-8-4.5z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M8.5 11.5h7M8.5 14.5h4.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
-        </span>
-        <span class="brand-name">ListSmart</span>
-      </a>
-      <nav class="nav" aria-label="Sections">
-        <a href="#app">Create listing</a>
-        <a href="#how">How it works</a>
-        <a href="#eval">Results</a>
-      </nav>
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true">LS</span>
+        <div>
+          <span class="brand-name">ListSmart</span>
+          <span class="brand-tag">Photos in, listing out</span>
+        </div>
+      </div>
       <!-- Shows which services are live and which are running in mock mode -->
       <div id="health" class="health" role="status" aria-live="polite">
         <span class="health-dot"></span><span class="health-text">Checking services…</span>
@@ -36,303 +29,212 @@
     </div>
   </header>
 
-  <main id="main">
-    <!-- Hero -->
-    <section class="hero" id="top">
-      <div class="wrap hero-grid">
-        <div class="hero-copy">
-          <span class="eyebrow"><span class="eyebrow-dot" aria-hidden="true"></span>Open models · runs on your laptop</span>
-          <h1>Product photos in.<br><span class="grad">Ready-to-sell listing</span> out.</h1>
-          <p class="lead">Upload a few photos and get a Meesho or Etsy listing with a smart price in under a minute.
-            Gemma reads your photos and our fine-tuned Qwen3 writer drafts the listing, right on your own laptop.</p>
-          <p id="demo-banner" class="demo-banner" hidden>Demo mode: using a built-in sample response, no backend needed.</p>
-          <div class="hero-cta">
-            <a class="btn btn-primary btn-lg" href="#app">Create a listing
-              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14m-6-6 6 6-6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-            </a>
-            <a class="btn btn-ghost btn-lg" href="#eval">See the results</a>
-          </div>
-          <ul class="trust">
-            <li><span class="trust-ico" aria-hidden="true">🔒</span><div><b>Private</b><span>Photos never leave your device</span></div></li>
-            <li><span class="trust-ico" aria-hidden="true">₹0</span><div><b>Free to run</b><span>No per-listing API bill</span></div></li>
-            <li><span class="trust-ico" aria-hidden="true">✦</span><div><b>Fine-tuned</b><span>Trained on good listings</span></div></li>
-          </ul>
-        </div>
+  <main id="main" class="wrap">
+    <section class="hero">
+      <h1>Write your product listing in one click</h1>
+      <p>Upload 1–5 photos. Open models run on your own laptop: Gemma 3 reads the photos and our
+        fine-tuned Qwen3 writer drafts the listing. Your photos never leave this device and each listing costs ₹0.</p>
+      <p id="demo-banner" class="demo-banner" hidden>Demo mode: using a built-in sample response, no backend needed.</p>
+    </section>
 
-        <!-- Decorative preview of a finished listing -->
-        <div class="hero-art" aria-hidden="true">
-          <div class="mock mock-main">
-            <div class="mock-photo"><span>👗</span></div>
-            <div class="mock-body">
-              <div class="mock-pill">Meesho · 86 / 100</div>
-              <div class="mock-title">Maroon Cotton Block Print Straight Kurti for Women</div>
-              <div class="mock-line w90"></div>
-              <div class="mock-line w75"></div>
-              <div class="mock-tags"><span>kurti</span><span>cotton</span><span>block print</span><span>ethnic</span></div>
-            </div>
+    <!-- Setup hint, shown only when Ollama or a model is missing -->
+    <div id="health-hint" class="card hint-card" role="status" hidden></div>
+
+    <!-- Step 1: the input form -->
+    <form id="gen-form" class="card form-card" novalidate>
+      <div class="field">
+        <span class="label" id="photos-label">Product photos <span class="muted">(1–5 images, JPG/PNG/WEBP, up to 8 MB each)</span></span>
+        <div id="dropzone" class="dropzone" tabindex="0" role="button" aria-labelledby="photos-label" aria-describedby="drop-help">
+          <svg class="drop-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16V4m0 0-4 4m4-4 4 4M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <p><strong>Drag &amp; drop photos here</strong> or <span class="link-like">browse files</span></p>
+          <p id="drop-help" class="muted small">Tip: a front view plus one close-up of the fabric or detail works best.</p>
+          <input id="file-input" type="file" accept="image/jpeg,image/png,image/webp" multiple class="visually-hidden" tabindex="-1">
+        </div>
+        <p id="file-error" class="error" role="alert" hidden></p>
+        <ul id="previews" class="previews" aria-label="Selected photos"></ul>
+      </div>
+
+      <div class="form-grid">
+        <fieldset class="field">
+          <legend class="label">Platform</legend>
+          <div class="segmented">
+            <input type="radio" id="pf-meesho" name="platform" value="meesho" checked>
+            <label for="pf-meesho">Meesho <span class="muted small">title ≤ 100</span></label>
+            <input type="radio" id="pf-etsy" name="platform" value="etsy">
+            <label for="pf-etsy">Etsy <span class="muted small">title ≤ 140</span></label>
           </div>
-          <div class="mock mock-price">
-            <span class="mock-k">Suggested price</span>
-            <span class="mock-v">₹479</span>
-            <span class="mock-s">5% under the median of 12 sellers</span>
+        </fieldset>
+
+        <div class="field">
+          <label class="label" for="cost-price">Your cost price <span class="muted">(optional, ₹)</span></label>
+          <div class="input-prefix">
+            <span aria-hidden="true">₹</span>
+            <input id="cost-price" name="cost_price" type="number" inputmode="decimal" min="0" step="1" placeholder="e.g. 250">
           </div>
-          <div class="mock mock-privacy">
-            <span class="ok-dot"></span> Ran locally · ₹0.00
-          </div>
+          <p class="muted small">We will keep the suggested price at least 25% above this.</p>
         </div>
       </div>
-    </section>
 
-    <!-- How it works -->
-    <section class="how wrap" id="how" aria-labelledby="how-title">
-      <h2 id="how-title" class="section-title">How it works</h2>
-      <ol class="how-grid">
-        <li class="how-card"><span class="how-num">1</span><h3>Read the photos</h3><p>Gemma, an open vision model, finds the product type, colour, material and key details.</p></li>
-        <li class="how-card"><span class="how-num">2</span><h3>Write the listing</h3><p>Our Qwen3-8B, fine-tuned on Tinker, writes a title, description, 5 bullets and tags within the platform rules.</p></li>
-        <li class="how-card"><span class="how-num">3</span><h3>Price it right</h3><p>We check competitor prices on Google Shopping and suggest a price that still keeps your margin.</p></li>
+      <div class="field">
+        <label class="label" for="notes">Seller notes <span class="muted">(optional)</span></label>
+        <textarea id="notes" name="notes" rows="3" maxlength="1000" placeholder="e.g. Pure cotton, sizes S to XXL, hand block printed in Jaipur"></textarea>
+      </div>
+
+      <!-- Private mode: nothing at all is sent to the internet -->
+      <div class="field toggle-field">
+        <label class="switch" for="offline-toggle">
+          <input id="offline-toggle" type="checkbox" role="switch" aria-describedby="offline-help">
+          <span class="switch-track" aria-hidden="true"><span class="switch-thumb"></span></span>
+          <span class="switch-label">Private mode — runs on this laptop</span>
+        </label>
+        <p id="offline-help" class="muted small">Photos and listing writing always stay on your laptop when the local models are installed.
+          The only online step is the competitor price check (a short search text sent to Google Shopping via SerpApi).
+          Private mode skips that step, so nothing leaves this device.</p>
+      </div>
+
+      <div class="form-actions">
+        <button id="gen-btn" type="submit" class="btn btn-primary" disabled>Generate listing</button>
+        <span id="form-hint" class="muted small">Add at least one photo to start.</span>
+      </div>
+
+      <!-- Loading steps shown while the backend works -->
+      <ol id="progress" class="progress" hidden aria-live="polite">
+        <!-- app.js replaces these labels to match local / hosted / private mode -->
+        <li id="step-vision" data-step="0">Reading photos with Gemma…</li>
+        <li id="step-writer" data-step="1">Writing listing…</li>
+        <li id="step-pricing" data-step="2">Checking competitor prices…</li>
       </ol>
-    </section>
+      <p id="gen-error" class="error" role="alert" hidden></p>
+    </form>
 
-    <!-- The app -->
-    <section class="app wrap" id="app" aria-label="Create a listing">
-      <!-- Setup hint, shown only when Ollama or a model is missing -->
-      <div id="health-hint" class="card hint-card" role="status" hidden></div>
+    <!-- Step 2: results (hidden until we have a response) -->
+    <section id="results" class="results" hidden aria-labelledby="results-title">
+      <div class="results-head">
+        <h2 id="results-title">Your listing</h2>
+        <div class="results-actions">
+          <span id="meta" class="muted small"></span>
+          <button id="copy-all" type="button" class="btn">Copy all</button>
+        </div>
+      </div>
 
-      <div class="app-grid">
-        <!-- Step 1: the input form -->
-        <form id="gen-form" class="card form-card" novalidate>
-          <div class="card-head">
-            <span class="step-badge">Step 1</span>
-            <h2 class="card-title">Add your product</h2>
-          </div>
+      <!-- Privacy and cost of this one result (filled from the response "meta") -->
+      <div id="privacy-strip" class="privacy-strip" role="group" aria-label="Privacy and cost of this result"></div>
 
-          <div class="field">
-            <span class="label" id="photos-label">Product photos <span class="muted">1–5 images · JPG, PNG, WEBP · up to 8 MB</span></span>
-            <div id="dropzone" class="dropzone" tabindex="0" role="button" aria-labelledby="photos-label" aria-describedby="drop-help">
-              <span class="drop-ico" aria-hidden="true">
-                <svg viewBox="0 0 24 24"><path d="M12 16V4m0 0-4 4m4-4 4 4M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
-              </span>
-              <p class="drop-main"><strong>Drop photos here</strong> or <span class="link-like">browse</span></p>
-              <p id="drop-help" class="muted small">Tip: one front view plus one close-up of the fabric or detail works best.</p>
-              <input id="file-input" type="file" accept="image/jpeg,image/png,image/webp" multiple class="visually-hidden" tabindex="-1">
+      <div class="card">
+        <h3 class="card-title">What Gemma saw in your photos</h3>
+        <div id="attributes" class="chips"></div>
+      </div>
+
+      <div class="results-grid">
+        <!-- Listing card: every field is editable -->
+        <article class="card listing-card" aria-labelledby="listing-title">
+          <h3 id="listing-title" class="card-title">Listing <span class="muted small">(click any field to edit)</span></h3>
+
+          <div class="out-field">
+            <div class="out-head">
+              <label for="out-title" class="label">Title</label>
+              <span id="title-count" class="counter" aria-live="polite"></span>
+              <button type="button" class="btn btn-small" data-copy="title">Copy</button>
             </div>
-            <p id="file-error" class="error" role="alert" hidden></p>
-            <ul id="previews" class="previews" aria-label="Selected photos"></ul>
+            <textarea id="out-title" rows="2"></textarea>
           </div>
 
+          <div class="out-field">
+            <div class="out-head">
+              <label for="out-desc" class="label">Description</label>
+              <button type="button" class="btn btn-small" data-copy="description">Copy</button>
+            </div>
+            <textarea id="out-desc" rows="7"></textarea>
+          </div>
+
+          <div class="out-field">
+            <div class="out-head">
+              <span class="label" id="bullets-label">Key points</span>
+              <button type="button" class="btn btn-small" data-copy="bullets">Copy</button>
+            </div>
+            <ol id="out-bullets" class="bullets" aria-labelledby="bullets-label"></ol>
+          </div>
+
+          <div class="out-field">
+            <div class="out-head">
+              <span class="label" id="tags-label">Tags</span>
+              <span id="tag-count" class="counter"></span>
+              <button type="button" class="btn btn-small" data-copy="tags">Copy</button>
+            </div>
+            <div id="out-tags" class="chips" aria-labelledby="tags-label"></div>
+            <div class="tag-add">
+              <label for="tag-input" class="visually-hidden">Add a tag</label>
+              <input id="tag-input" type="text" maxlength="40" placeholder="Add a tag and press Enter">
+            </div>
+            <p class="muted small">Each tag should be 20 characters or less. Longer ones are flagged in red.</p>
+          </div>
+        </article>
+
+        <!-- Pricing card -->
+        <article class="card pricing-card" aria-labelledby="pricing-title">
+          <h3 id="pricing-title" class="card-title">Suggested price</h3>
+          <p id="pricing-note" class="pricing-note small" hidden></p>
+          <div class="price-big" id="price-big">–</div>
+          <p id="margin" class="muted small"></p>
+          <p id="strategy" class="strategy"></p>
+          <dl id="stats" class="stats"></dl>
+          <div id="strip" class="strip" role="img"></div>
+          <h4 class="sub-title">Competitors on Google Shopping</h4>
+          <ul id="competitors" class="competitors"></ul>
+        </article>
+      </div>
+
+      <!-- Feedback: helps us learn if sellers would really use and pay for this -->
+      <section id="feedback" class="card feedback-card" aria-labelledby="feedback-title">
+        <h3 id="feedback-title" class="card-title">Was this listing useful?</h3>
+        <div class="fb-row">
+          <button id="fb-up" type="button" class="btn fb-btn" aria-pressed="false"><span aria-hidden="true">👍</span> Good</button>
+          <button id="fb-down" type="button" class="btn fb-btn" aria-pressed="false"><span aria-hidden="true">👎</span> Not good</button>
+          <button id="fb-used" type="button" class="btn fb-btn" aria-pressed="false">I used this listing</button>
+        </div>
+
+        <form id="pay-form" class="pay-form" novalidate>
           <fieldset class="field">
-            <legend class="label">Platform</legend>
-            <div class="segmented">
-              <input type="radio" id="pf-meesho" name="platform" value="meesho" checked>
-              <label for="pf-meesho"><b>Meesho</b><span>title ≤ 100</span></label>
-              <input type="radio" id="pf-etsy" name="platform" value="etsy">
-              <label for="pf-etsy"><b>Etsy</b><span>title ≤ 140</span></label>
+            <legend class="label">Would you pay for this?</legend>
+            <div class="radio-row">
+              <label><input type="radio" name="would_pay" value="yes"> Yes</label>
+              <label><input type="radio" name="would_pay" value="maybe"> Maybe</label>
+              <label><input type="radio" name="would_pay" value="no"> No</label>
             </div>
           </fieldset>
-
-          <div class="field">
-            <label class="label" for="cost-price">Your cost price <span class="muted">optional</span></label>
-            <div class="input-prefix">
-              <span aria-hidden="true">₹</span>
-              <input id="cost-price" name="cost_price" type="number" inputmode="decimal" min="0" step="1" placeholder="250">
+          <div class="form-grid">
+            <div class="field">
+              <label class="label" for="pay-price">A fair price per month <span class="muted">(optional, ₹)</span></label>
+              <div class="input-prefix">
+                <span aria-hidden="true">₹</span>
+                <input id="pay-price" type="number" inputmode="decimal" min="0" max="100000" step="1" placeholder="e.g. 199">
+              </div>
             </div>
-            <p class="muted small">We keep the suggested price at least 25% above this.</p>
+            <div class="field">
+              <label class="label" for="pay-comment">What should we add next? <span class="muted">(optional)</span></label>
+              <textarea id="pay-comment" rows="2" maxlength="1000" placeholder="e.g. Hindi descriptions, bulk upload"></textarea>
+            </div>
           </div>
-
-          <div class="field">
-            <label class="label" for="notes">Seller notes <span class="muted">optional</span></label>
-            <textarea id="notes" name="notes" rows="3" maxlength="1000" placeholder="Pure cotton, sizes S to XXL, hand block printed in Jaipur"></textarea>
-          </div>
-
-          <!-- Private mode: nothing at all is sent to the internet -->
-          <div class="field toggle-field">
-            <label class="switch" for="offline-toggle">
-              <input id="offline-toggle" type="checkbox" role="switch" aria-describedby="offline-help">
-              <span class="switch-track" aria-hidden="true"><span class="switch-thumb"></span></span>
-              <span class="switch-label">Private mode</span>
-            </label>
-            <p id="offline-help" class="muted small">Skips the competitor price check, the only online step, so nothing leaves this device.</p>
-          </div>
-
-          <div class="form-actions">
-            <button id="gen-btn" type="submit" class="btn btn-primary btn-block" disabled>
-              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l1.8 4.7L18.5 9.5l-4.7 1.8L12 16l-1.8-4.7L5.5 9.5l4.7-1.8z" fill="currentColor"/></svg>
-              Generate listing
-            </button>
-            <span id="form-hint" class="muted small">Add at least one photo to start.</span>
-          </div>
-
-          <!-- Loading steps shown while the backend works -->
-          <ol id="progress" class="progress" hidden aria-live="polite">
-            <!-- app.js replaces these labels to match local / hosted / private mode -->
-            <li id="step-vision" data-step="0">Reading photos with Gemma…</li>
-            <li id="step-writer" data-step="1">Writing listing…</li>
-            <li id="step-pricing" data-step="2">Checking competitor prices…</li>
-          </ol>
-          <p id="gen-error" class="error" role="alert" hidden></p>
+          <button id="pay-submit" type="submit" class="btn">Send feedback</button>
         </form>
-
-        <div class="output-col">
-          <!-- Placeholder until the first result arrives -->
-          <div id="empty-state" class="card empty-state">
-            <div class="empty-art" aria-hidden="true">
-              <span class="ea ea1"></span><span class="ea ea2"></span><span class="ea ea3"></span>
-            </div>
-            <h2>Your listing will appear here</h2>
-            <p class="muted">Add photos on the left and press <b>Generate listing</b>. You will get a title, description,
-              5 bullet points, search tags and a suggested price, all editable.</p>
-          </div>
-
-          <!-- Step 2: results (hidden until we have a response) -->
-          <section id="results" class="results" hidden aria-labelledby="results-title">
-            <div class="results-head">
-              <div>
-                <span class="step-badge">Step 2</span>
-                <h2 id="results-title">Your listing</h2>
-              </div>
-              <div class="results-actions">
-                <span id="meta" class="muted small"></span>
-                <button id="copy-all" type="button" class="btn btn-primary">
-                  <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="8" width="12" height="12" rx="2.5" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2" fill="none" stroke="currentColor" stroke-width="1.8"/></svg>
-                  Copy all
-                </button>
-              </div>
-            </div>
-
-            <!-- Privacy and cost of this one result (filled from the response "meta") -->
-            <div id="privacy-strip" class="privacy-strip" role="group" aria-label="Privacy and cost of this result"></div>
-
-            <div class="card attr-card">
-              <h3 class="card-title small-title">What Gemma saw in your photos</h3>
-              <div id="attributes" class="chips"></div>
-            </div>
-
-            <!-- Listing card: every field is editable -->
-            <article class="card listing-card" aria-labelledby="listing-title">
-              <h3 id="listing-title" class="card-title">Listing <span class="muted small">click any field to edit</span></h3>
-
-              <div class="out-field">
-                <div class="out-head">
-                  <label for="out-title" class="label">Title</label>
-                  <span id="title-count" class="counter" aria-live="polite"></span>
-                  <button type="button" class="btn btn-small" data-copy="title">Copy</button>
-                </div>
-                <textarea id="out-title" class="title-input" rows="2"></textarea>
-              </div>
-
-              <div class="out-field">
-                <div class="out-head">
-                  <label for="out-desc" class="label">Description</label>
-                  <button type="button" class="btn btn-small" data-copy="description">Copy</button>
-                </div>
-                <textarea id="out-desc" rows="7"></textarea>
-              </div>
-
-              <div class="out-field">
-                <div class="out-head">
-                  <span class="label" id="bullets-label">Key points</span>
-                  <button type="button" class="btn btn-small" data-copy="bullets">Copy</button>
-                </div>
-                <ol id="out-bullets" class="bullets" aria-labelledby="bullets-label"></ol>
-              </div>
-
-              <div class="out-field">
-                <div class="out-head">
-                  <span class="label" id="tags-label">Tags</span>
-                  <span id="tag-count" class="counter"></span>
-                  <button type="button" class="btn btn-small" data-copy="tags">Copy</button>
-                </div>
-                <div id="out-tags" class="chips" aria-labelledby="tags-label"></div>
-                <div class="tag-add">
-                  <label for="tag-input" class="visually-hidden">Add a tag</label>
-                  <input id="tag-input" type="text" maxlength="40" placeholder="+ Add a tag and press Enter">
-                </div>
-                <p class="muted small">Each tag should be 20 characters or less. Longer ones are flagged in red.</p>
-              </div>
-            </article>
-
-            <!-- Pricing card -->
-            <article class="card pricing-card" aria-labelledby="pricing-title">
-              <div class="price-top">
-                <div>
-                  <h3 id="pricing-title" class="card-title small-title">Suggested price</h3>
-                  <div class="price-big" id="price-big">–</div>
-                  <p id="margin" class="muted small"></p>
-                </div>
-                <p id="strategy" class="strategy"></p>
-              </div>
-              <p id="pricing-note" class="pricing-note small" hidden></p>
-              <dl id="stats" class="stats"></dl>
-              <div id="strip" class="strip" role="img"></div>
-              <h4 class="sub-title">Competitors on Google Shopping</h4>
-              <ul id="competitors" class="competitors"></ul>
-            </article>
-
-            <!-- Feedback: helps us learn if sellers would really use and pay for this -->
-            <section id="feedback" class="card feedback-card" aria-labelledby="feedback-title">
-              <h3 id="feedback-title" class="card-title small-title">Was this listing useful?</h3>
-              <div class="fb-row">
-                <button id="fb-up" type="button" class="btn fb-btn" aria-pressed="false"><span aria-hidden="true">👍</span> Good</button>
-                <button id="fb-down" type="button" class="btn fb-btn" aria-pressed="false"><span aria-hidden="true">👎</span> Not good</button>
-                <button id="fb-used" type="button" class="btn fb-btn" aria-pressed="false">✓ I used this listing</button>
-              </div>
-
-              <form id="pay-form" class="pay-form" novalidate>
-                <fieldset class="field">
-                  <legend class="label">Would you pay for this?</legend>
-                  <div class="radio-row">
-                    <label><input type="radio" name="would_pay" value="yes"> Yes</label>
-                    <label><input type="radio" name="would_pay" value="maybe"> Maybe</label>
-                    <label><input type="radio" name="would_pay" value="no"> No</label>
-                  </div>
-                </fieldset>
-                <div class="form-grid">
-                  <div class="field">
-                    <label class="label" for="pay-price">Fair price per month <span class="muted">optional</span></label>
-                    <div class="input-prefix">
-                      <span aria-hidden="true">₹</span>
-                      <input id="pay-price" type="number" inputmode="decimal" min="0" max="100000" step="1" placeholder="199">
-                    </div>
-                  </div>
-                  <div class="field">
-                    <label class="label" for="pay-comment">What should we add next? <span class="muted">optional</span></label>
-                    <textarea id="pay-comment" rows="2" maxlength="1000" placeholder="Hindi descriptions, bulk upload…"></textarea>
-                  </div>
-                </div>
-                <button id="pay-submit" type="submit" class="btn">Send feedback</button>
-              </form>
-              <p id="fb-thanks" class="fb-thanks" role="status" aria-live="polite"></p>
-              <p id="fb-error" class="error" role="alert" hidden></p>
-            </section>
-          </section>
-        </div>
-      </div>
+        <p id="fb-thanks" class="fb-thanks" role="status" aria-live="polite"></p>
+        <p id="fb-error" class="error" role="alert" hidden></p>
+      </section>
     </section>
 
     <!-- Step 3: base vs fine-tuned evaluation -->
-    <section class="wrap eval-wrap">
-      <div id="eval" class="card eval-card" aria-labelledby="eval-title">
-        <span class="eyebrow eyebrow-soft">Measured, not claimed</span>
-        <h2 id="eval-title" class="section-title">Base vs fine-tuned writer</h2>
-        <p class="muted">Scored on a held-out test set the model never saw during training
-          (open Qwen3-8B + LoRA fine-tune trained on Tinker, then run on a laptop with Ollama).</p>
-        <div id="eval-body"><p class="muted">Loading results…</p></div>
-      </div>
+    <section id="eval" class="card eval-card" aria-labelledby="eval-title">
+      <h2 id="eval-title" class="card-title">Base vs Fine-tuned writer</h2>
+      <p class="muted">Measured on a held-out test set the model never saw during training
+        (open Qwen3-8B + LoRA fine-tune trained on Tinker, then run on a laptop with Ollama).</p>
+      <div id="eval-body"><p class="muted">Loading results…</p></div>
     </section>
   </main>
 
-  <footer class="footer">
-    <div class="wrap footer-inner">
-      <div class="brand brand-small">
-        <span class="brand-mark" aria-hidden="true">
-          <svg viewBox="0 0 24 24"><path d="M4 7.5 12 3l8 4.5v9L12 21l-8-4.5z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M8.5 11.5h7M8.5 14.5h4.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
-        </span>
-        <span class="brand-name">ListSmart</span>
-      </div>
-      <p class="muted small">Built with open models: Gemma vision + fine-tuned Qwen3-8B (trained on Tinker, run with Ollama), SerpApi and Render.</p>
-      <!-- Small running count of seller feedback -->
-      <p id="fb-summary" class="muted small" aria-live="polite"></p>
-    </div>
+  <footer class="wrap footer muted small">
+    <p>Built with open models (Gemma 3 vision + fine-tuned Qwen3-8B, trained on Tinker, run with Ollama), SerpApi and Render.</p>
+    <!-- Small running count of seller feedback -->
+    <p id="fb-summary" aria-live="polite"></p>
   </footer>
 
   <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
